@@ -90,11 +90,18 @@ export function OverlayApp() {
         processor.onaudioprocess = (e) => {
           const float32 = e.inputBuffer.getChannelData(0);
           const pcm16 = new Int16Array(float32.length);
+          let sumSq = 0;
           for (let i = 0; i < float32.length; i++) {
             const s = Math.max(-1, Math.min(1, float32[i]));
             pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+            sumSq += s * s;
           }
           window.flicky.sendAudioChunk(pcm16.buffer);
+
+          // <PROJECT_NAME> — push the per-tick RMS to the recording pill.
+          // ~21Hz at 16kHz/4096 buffer; cheap enough to send raw.
+          const rms = Math.sqrt(sumSq / float32.length);
+          window.flicky.sendAudioLevel?.(rms);
         };
 
         source.connect(processor);

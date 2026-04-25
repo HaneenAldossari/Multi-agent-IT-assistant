@@ -148,6 +148,27 @@ const api = {
     return () => ipcRenderer.removeListener(IPC.SHOW_AGENT_PANEL, handler);
   },
 
+  // <PROJECT_NAME> — Wispr-style recording pill bridge.
+  onShowRecPill: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on(IPC.SHOW_REC_PILL, handler);
+    return () => ipcRenderer.removeListener(IPC.SHOW_REC_PILL, handler);
+  },
+  onHideRecPill: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on(IPC.HIDE_REC_PILL, handler);
+    return () => ipcRenderer.removeListener(IPC.HIDE_REC_PILL, handler);
+  },
+  onRecPillAudioLevel: (cb: (level: number) => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, level: number) => cb(level);
+    ipcRenderer.on(IPC.REC_PILL_AUDIO_LEVEL, handler);
+    return () => ipcRenderer.removeListener(IPC.REC_PILL_AUDIO_LEVEL, handler);
+  },
+  /** Renderer (overlay) → Main: per-audio-tick RMS level in [0, 1]. */
+  sendAudioLevel: (level: number): void => {
+    ipcRenderer.send('audio-level', level);
+  },
+
   // ── Audio Capture (overlay ↔ main) ──────────────────────────────────
   // ── Overlay / display info ────────────────────────────────────────
   onDisplayInfo: (

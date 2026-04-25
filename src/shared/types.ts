@@ -248,4 +248,10 @@ export const IPC = {
   // Fires every time a new request begins; renderer treats each fire as a
   // hard restart of the animation timeline.
   SHOW_AGENT_PANEL: 'show-agent-panel',
+
+  // <PROJECT_NAME> — Wispr-style recording pill (bottom-center of primary
+  // display, fades in/out with mic state, animates audio levels).
+  SHOW_REC_PILL: 'show-rec-pill',
+  HIDE_REC_PILL: 'hide-rec-pill',
+  REC_PILL_AUDIO_LEVEL: 'rec-pill-audio-level',
 } as const;

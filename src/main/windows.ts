@@ -199,6 +199,55 @@ export function createAgentPanelWindow(): BrowserWindow {
   return win;
 }
 
+/**
+ * <PROJECT_NAME> — Wispr-style recording pill. A small floating capsule
+ * anchored to the bottom-center of the primary display. Created hidden;
+ * shown when voiceState transitions to 'listening', hidden otherwise.
+ *
+ * Independent of the overlay window so the cursor-toggle setting can't
+ * accidentally hide it.
+ */
+export function createRecPillWindow(): BrowserWindow {
+  const primary = screen.getPrimaryDisplay();
+  const { workArea } = primary;
+  const width = 320;
+  const height = 64;
+  const bottomGutter = 36;
+
+  const win = new BrowserWindow({
+    x: Math.round(workArea.x + (workArea.width - width) / 2),
+    y: Math.round(workArea.y + workArea.height - height - bottomGutter),
+    width,
+    height,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    transparent: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    focusable: false,
+    title: 'Sanad Mic',
+    webPreferences: {
+      preload: getPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  win.setIgnoreMouseEvents(true, { forward: false });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  loadPage(win, 'rec-pill');
+  return win;
+}
+
 function defaultStreamBounds(): StreamWindowBounds {
   const primary = screen.getPrimaryDisplay();
   const { workArea } = primary;

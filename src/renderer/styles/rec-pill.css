@@ -1,0 +1,83 @@
+/* ── <PROJECT_NAME> Recording Pill (Wispr-style) ───────────────────────
+ * Bottom-center floating capsule that appears while the mic is hot.
+ * Live waveform driven by the audio-level IPC stream.
+ * ──────────────────────────────────────────────────────────────────── */
+
+html, body {
+  background: transparent !important;
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px 10px 14px;
+  background: rgba(18, 19, 21, 0.88);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 999px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 14px 40px rgba(0, 0, 0, 0.55),
+    0 0 0 4px rgba(229, 72, 77, 0.10);
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.94);
+  white-space: nowrap;
+  user-select: none;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 220ms cubic-bezier(.2,.7,.3,1),
+    transform 220ms cubic-bezier(.2,.7,.3,1);
+}
+.pill.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Pulsing red dot ────────────────────────────────────────────────── */
+.pill .dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #E5484D;
+  animation: rp-pulse 1.2s ease-out infinite;
+}
+@keyframes rp-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.6); transform: scale(1); }
+  70%  { box-shadow: 0 0 0 8px rgba(229, 72, 77, 0); transform: scale(1.06); }
+  100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0);   transform: scale(1); }
+}
+
+/* ── Live waveform ──────────────────────────────────────────────────── */
+.wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  width: 92px;
+}
+.wave .bar {
+  flex: 1 1 auto;
+  min-height: 3px;
+  height: 3px;
+  background: linear-gradient(180deg, #f0f4ff 0%, #6ea6ff 100%);
+  border-radius: 1.5px;
+  transition: height 80ms cubic-bezier(.2,.7,.3,1);
+}
+
+/* Idle state — the bars still wiggle very slightly so the pill never
+ * feels frozen even when the mic is silent. */
+.pill .text {
+  letter-spacing: 0;
+}

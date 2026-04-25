@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, globalShortcut, screen, ipcMain, shell, nativeImage } from 'electron';
 import path from 'path';
 import { CompanionManager } from './companion-manager';
-import { createPanelWindow, createOverlayWindow, createStreamWindow, createAgentPanelWindow } from './windows';
+import { createPanelWindow, createOverlayWindow, createStreamWindow, createAgentPanelWindow, createRecPillWindow } from './windows';
 import { IPC, type StreamVisibility, type StreamWindowBounds } from '../shared/types';
 import { AUDIO_IPC } from './services/audio-capture';
 import * as chatHistory from './services/chat-history-store';
@@ -18,6 +18,8 @@ let overlayWindows: BrowserWindow[] = [];
 let streamWindow: BrowserWindow | null = null;
 let agentPanelWindow: BrowserWindow | null = null;
 let agentPanelHideTimer: ReturnType<typeof setTimeout> | null = null;
+let recPillWindow: BrowserWindow | null = null;
+let recPillHideTimer: ReturnType<typeof setTimeout> | null = null;
 let companion: CompanionManager;
 let isAppQuitting = false;
 let lastVoiceState = 'idle';
@@ -108,6 +110,7 @@ app.whenReady().then(() => {
       lastVoiceState = state;
       sendToAll(IPC.VOICE_STATE_CHANGED, state);
       updateStreamForVoiceState(state);
+      updateRecPillForVoiceState(state);
     },
     onTranscriptUpdate: (result) => sendToAll(IPC.TRANSCRIPT_UPDATE, result),
     onAiResponseChunk: (chunk) => {
@@ -177,6 +180,22 @@ app.whenReady().then(() => {
     if (!isAppQuitting) {
       e.preventDefault();
       agentPanelWindow?.hide();
+    }
+  });
+
+  // <PROJECT_NAME> — Wispr-style recording pill. Created hidden; surfaced
+  // when voiceState transitions to 'listening'. Audio-level frames flow
+  // through here from overlay → main → pill renderer.
+  recPillWindow = createRecPillWindow();
+  recPillWindow.on('close', (e) => {
+    if (!isAppQuitting) {
+      e.preventDefault();
+      recPillWindow?.hide();
+    }
+  });
+  ipcMain.on('audio-level', (_e, level: number) => {
+    if (recPillWindow && !recPillWindow.isDestroyed() && recPillWindow.isVisible()) {
+      recPillWindow.webContents.send(IPC.REC_PILL_AUDIO_LEVEL, level);
     }
   });
 
@@ -431,6 +450,33 @@ function showAgentPanel(): void {
     }
     agentPanelHideTimer = null;
   }, 12500);
+}
+
+/**
+ * Show / hide the recording pill in lockstep with the voice state. The
+ * pill window stays mapped between requests; we just toggle its
+ * visibility (and let the renderer animate the fade in/out).
+ */
+function updateRecPillForVoiceState(state: string): void {
+  if (!recPillWindow || recPillWindow.isDestroyed()) return;
+  if (state === 'listening') {
+    if (recPillHideTimer) {
+      clearTimeout(recPillHideTimer);
+      recPillHideTimer = null;
+    }
+    recPillWindow.showInactive();
+    recPillWindow.webContents.send(IPC.SHOW_REC_PILL);
+  } else {
+    if (!recPillWindow.isVisible()) return;
+    recPillWindow.webContents.send(IPC.HIDE_REC_PILL);
+    if (recPillHideTimer) clearTimeout(recPillHideTimer);
+    // Match the renderer's fade-out CSS transition (~220ms) plus a small
+    // tail so we don't yank the window mid-fade.
+    recPillHideTimer = setTimeout(() => {
+      if (recPillWindow && !recPillWindow.isDestroyed()) recPillWindow.hide();
+      recPillHideTimer = null;
+    }, 280);
+  }
 }
 
 function persistStreamBounds(): void {

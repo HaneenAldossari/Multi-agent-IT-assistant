@@ -19,6 +19,7 @@ export default defineConfig({
         overlay: path.resolve(__dirname, 'src/renderer/overlay.html'),
         stream: path.resolve(__dirname, 'src/renderer/stream.html'),
         agentPanel: path.resolve(__dirname, 'src/renderer/agent-panel.html'),
+        recPill: path.resolve(__dirname, 'src/renderer/rec-pill.html'),
       },
     },
   },
