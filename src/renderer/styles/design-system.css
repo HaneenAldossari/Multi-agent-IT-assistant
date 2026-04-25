@@ -1,6 +1,8 @@
 /* ── Flicky Design System ───────────────────────────────────────────────
  * Ported from DesignSystem.swift — dark theme, Tailwind Blue accent.
+ * <PROJECT_NAME> additions: Arabic web fonts (Cairo + Tajawal) + RTL.
  * ──────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&display=swap');
 
 :root {
   /* ── Background layers (darkest → lightest) ─────────────────────── */
@@ -61,7 +63,10 @@
   --space-3xl:  32px;
 
   /* ── Typography ─────────────────────────────────────────────────── */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  /* Arabic-first stack: Cairo for UI body, Tajawal as fallback, then
+   * Latin system fonts so English technical terms (VPN, ADFS, NCA) still
+   * render natively. Order matters — Cairo handles both scripts well. */
+  --font-sans: 'Cairo', 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
 }
 

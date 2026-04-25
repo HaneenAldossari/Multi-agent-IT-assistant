@@ -471,25 +471,38 @@ export class CompanionManager {
       signal: abort.signal,
     };
 
-    if (settings.mindProvider === 'openai') {
-      await this.openai.streamChat(
-        result.text,
-        this.lastScreenshots,
-        this.context.getMessagesForSend(),
-        settings.selectedOpenAIModel,
-        mindOptions,
-        mindCallbacks,
-      );
-    } else {
-      await this.claude.streamChat(
-        result.text,
-        this.lastScreenshots,
-        this.context.getMessagesForSend(),
-        settings.selectedModel,
-        mindOptions,
-        mindCallbacks,
-      );
+    // ── <PROJECT_NAME> integration boundary (Phase 1 / Day-1 stub) ──────
+    // Real handleUserRequest() with 4 agents (Memory, Resolver, Guardian,
+    // Reporter) replaces this in Phase 2 per Integration Spec §5.1.
+    // For the Day-1 checkpoint we only need to prove the wiring is intact:
+    //   PTT → transcription → screenshot → THIS STUB → cursor overlay + TTS
+    // Honors abort + turnId so a new PTT press cleanly cancels mid-stub.
+    void mindOptions;  // unused in stub; real orchestrator (Phase 2) consumes it
+    const STUB_DELAY_MS = 2000;
+    let stubAborted = false;
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, STUB_DELAY_MS);
+      abort.signal.addEventListener('abort', () => {
+        stubAborted = true;
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+
+    if (!stubAborted && isCurrent()) {
+      // Aim the mock cursor at the center of the active screen so we can
+      // visually verify the parsePointTags → CursorIcon path still works.
+      const firstScreen = this.lastScreenshots[0];
+      const centerX = Math.floor((firstScreen?.imageWidth ?? 800) / 2);
+      const centerY = Math.floor((firstScreen?.imageHeight ?? 600) / 2);
+      const mockReply =
+        `هذا رد تجريبي من <PROJECT_NAME>. الوكلاء الحقيقيون لم يُبنوا بعد. ` +
+        `[POINT:${centerX},${centerY}:منتصف الشاشة:screen0]`;
+
+      mindCallbacks.onChunk(mockReply);
+      await mindCallbacks.onComplete(mockReply);
     }
+    // ── end <PROJECT_NAME> integration boundary ─────────────────────────
 
     if (this.currentAbort === abort) this.currentAbort = null;
   }
