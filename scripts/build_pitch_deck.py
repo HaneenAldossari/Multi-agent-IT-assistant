@@ -530,67 +530,90 @@ def slide_roadmap(prs):
     add_solid_bg(s)
     add_slide_title(s, "خارطة الطريق", "Roadmap")
 
-    # Two forward-looking columns. The current-phase recap column is
-    # intentionally omitted — judges care about what comes next, not a
-    # checklist of what's already done.
+    # Three columns: Before (done) → During (in progress) → After (planned).
+    # Each gets a status badge under the bilingual header so the phase
+    # state reads at a glance.
     phases = [
         {
-            "ar": "الهاكاثون — ٣ أيام",
-            "en": "Hackathon — 3 Days",
-            "accent": AMBER,
+            "ar": "قبل الهاكاثون",
+            "en": "Before",
+            "badge": "✅  مكتمل",
+            "accent": RESOLVER,  # green
             "items": [
-                "تشغيل الوكلاء الأربعة على Claude Sonnet",
-                "بناء طبقة الاسترجاع (RAG) للسياسات وسجل البلاغات",
-                "سيناريو VPN متعدد المستخدمين كاملاً",
-                "سيناريو رفض الحارس لتثبيت برنامج غير معتمد",
-                "ديمو يعمل من البداية للنهاية",
+                "تحليل السوق وتصميم البنية متعددة الوكلاء",
+                "توثيق تقني كامل (PRD + Agent Specs)",
+                "Fork لـ Flicky وتعريب الواجهة",
+                "بناء Agent Panel البصري",
+            ],
+        },
+        {
+            "ar": "خلال الهاكاثون",
+            "en": "During (3 Days)",
+            "badge": "⏳  قيد التنفيذ",
+            "accent": MEMORY,  # blue
+            "items": [
+                "تفعيل الوكلاء الأربعة بـ Claude API",
+                "بناء طبقة RAG لقاعدة معرفة الشركة",
+                "سيناريو اكتشاف الحوادث الجماعية",
+                "سيناريو مراجعة Guardian",
+                "ديمو شغّال end-to-end",
             ],
         },
         {
             "ar": "ما بعد الهاكاثون",
-            "en": "Beyond",
-            "accent": TEXT_SECONDARY,
+            "en": "After",
+            "badge": "🚀  مخطط",
+            "accent": TEXT_SECONDARY,  # gray
             "items": [
-                "نشر تجريبي داخل شركة سعودية",
-                "تكامل مع Slack و Teams و Email",
-                "لوحة امتثال NCA للمسؤول الأمني",
-                "تحليلات للفريق التقني",
+                "Pilot مع شركة سعودية",
+                "تكامل مع Slack و Teams",
+                "لوحة تقارير NCA compliance",
                 "نسخة SaaS متعددة المستأجرين",
             ],
         },
     ]
-    margin = Inches(1.5)
-    spacing = Inches(0.4)
-    col_w = (SLIDE_W - margin * 2 - spacing) / 2
-    col_y = Inches(1.95)
-    col_h = Inches(5.1)
+    margin = Inches(0.6)
+    spacing = Inches(0.25)
+    col_w = (SLIDE_W - margin * 2 - spacing * 2) / 3
+    col_y = Inches(1.85)
+    col_h = Inches(5.2)
 
     for i, phase in enumerate(phases):
-        # RTL: i=0 (Phase 1) on the right
+        # RTL: i=0 (Before) on the right, i=2 (After) on the left.
         x = SLIDE_W - margin - col_w - i * (col_w + spacing)
         add_card(s, x, col_y, col_w, col_h, accent=phase["accent"])
-        pad = Inches(0.25)
+        pad = Inches(0.22)
 
-        add_text(s, x + pad, col_y + Inches(0.27),
-                 col_w - pad * 2, Inches(0.5),
+        # Bilingual header — Arabic dominant, English secondary
+        add_text(s, x + pad, col_y + Inches(0.22),
+                 col_w - pad * 2, Inches(0.45),
                  {"text": phase["ar"],
-                  "font": FONT_HEAD, "size": 15,
+                  "font": FONT_HEAD, "size": 17,
                   "bold": True, "color": phase["accent"]},
                  align=PP_ALIGN.RIGHT, rtl=True)
-        add_text(s, x + pad, col_y + Inches(0.78),
-                 col_w - pad * 2, Inches(0.32),
+        add_text(s, x + pad, col_y + Inches(0.7),
+                 col_w - pad * 2, Inches(0.3),
                  {"text": phase["en"],
                   "font": FONT_BODY, "size": 11, "color": TEXT_SECONDARY},
                  align=PP_ALIGN.RIGHT, rtl=False)
 
-        item_y = col_y + Inches(1.4)
+        # Status badge — small accent-colored pill of text
+        add_text(s, x + pad, col_y + Inches(1.05),
+                 col_w - pad * 2, Inches(0.35),
+                 {"text": phase["badge"],
+                  "font": FONT_BODY, "size": 12, "bold": True,
+                  "color": phase["accent"]},
+                 align=PP_ALIGN.RIGHT, rtl=True)
+
+        # Items
+        item_y = col_y + Inches(1.6)
         item_h = Inches(0.6)
         for j, item in enumerate(phase["items"]):
             add_text(s, x + pad, item_y + item_h * j,
                      col_w - pad * 2, item_h,
-                     {"text": "●  ", "font": FONT_BODY, "size": 12,
+                     {"text": "●  ", "font": FONT_BODY, "size": 11,
                       "color": phase["accent"]},
-                     {"text": item, "font": FONT_BODY, "size": 13,
+                     {"text": item, "font": FONT_BODY, "size": 12,
                       "color": TEXT_PRIMARY},
                      align=PP_ALIGN.RIGHT, rtl=True)
 
