@@ -43,6 +43,12 @@ export interface CompanionCallbacks {
   onPlayAudio: (audioBuffer: Buffer) => void;
   onCursorVisibilityChanged: (enabled: boolean) => void;
   onStreamVisibilityChanged: (v: StreamVisibility) => void;
+  /**
+   * <PROJECT_NAME> — fired at the start of every request so the agent
+   * collaboration panel restarts its (currently hard-coded) animation
+   * timeline. Will become real agent events once the orchestrator lands.
+   */
+  onAgentPanelShow: () => void;
 }
 
 export class CompanionManager {
@@ -478,6 +484,12 @@ export class CompanionManager {
     //   PTT → transcription → screenshot → THIS STUB → cursor overlay + TTS
     // Honors abort + turnId so a new PTT press cleanly cancels mid-stub.
     void mindOptions;  // unused in stub; real orchestrator (Phase 2) consumes it
+
+    // Kick off the visual agent-collaboration panel (demo theater). The
+    // panel runs its own ~12s animation independently — re-firing the
+    // callback restarts it from t=0.
+    this.callbacks.onAgentPanelShow();
+
     const STUB_DELAY_MS = 2000;
     let stubAborted = false;
     await new Promise<void>((resolve) => {

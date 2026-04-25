@@ -141,6 +141,13 @@ const api = {
     return () => ipcRenderer.removeListener(IPC.CLEAR_STREAM, handler);
   },
 
+  // <PROJECT_NAME> — Agent panel restart trigger.
+  onAgentPanelShow: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on(IPC.SHOW_AGENT_PANEL, handler);
+    return () => ipcRenderer.removeListener(IPC.SHOW_AGENT_PANEL, handler);
+  },
+
   // ── Audio Capture (overlay ↔ main) ──────────────────────────────────
   // ── Overlay / display info ────────────────────────────────────────
   onDisplayInfo: (

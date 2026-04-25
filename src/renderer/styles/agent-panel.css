@@ -1,0 +1,190 @@
+/* ── <PROJECT_NAME> Agent Collaboration Panel ───────────────────────────
+ * Floating top-left overlay shown during a request. Pure visual / demo
+ * for now — animation runs from a hard-coded timeline in agent-panel.ts.
+ * ──────────────────────────────────────────────────────────────────── */
+
+html, body {
+  background: transparent !important;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ap-root {
+  --ap-mem:   #4D8DFF; /* blue   — Memory   */
+  --ap-res:   #34D399; /* green  — Resolver */
+  --ap-grd:   #E5484D; /* red    — Guardian */
+  --ap-rep:   #B66BFF; /* purple — Reporter */
+
+  position: relative;
+  width: 380px;
+  height: 480px;
+  padding: 18px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  color: var(--text-primary, #ECEEED);
+  background: rgba(20, 22, 24, 0.82);
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.30);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.985);
+  transition:
+    opacity 320ms cubic-bezier(.2,.7,.3,1),
+    transform 320ms cubic-bezier(.2,.7,.3,1);
+  user-select: none;
+}
+
+.ap-root.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.ap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.ap-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.94);
+}
+.ap-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(255, 255, 255, 0.85);
+  animation: ap-spin 1s linear infinite;
+}
+@keyframes ap-spin { to { transform: rotate(360deg); } }
+
+/* ── Rows ───────────────────────────────────────────────────────────── */
+.ap-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.ap-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  transition: background 240ms ease, border-color 240ms ease, opacity 240ms ease;
+  opacity: 0.55;
+}
+
+.ap-avatar {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  position: relative;
+  transition: background 240ms ease, color 240ms ease, box-shadow 240ms ease;
+}
+
+.ap-body { flex: 1 1 auto; min-width: 0; }
+.ap-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  margin-bottom: 4px;
+}
+.ap-status {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.62);
+  word-wrap: break-word;
+  /* Allow long final messages to wrap nicely without overflowing */
+  white-space: normal;
+}
+
+/* ── Per-agent accent: thinking + active ────────────────────────────── */
+.ap-row[data-agent="memory"]   .ap-avatar { /* base */ }
+.ap-row.is-thinking[data-agent="memory"]   .ap-avatar { background: rgba(77, 141, 255, 0.18); color: var(--ap-mem); box-shadow: 0 0 0 2px rgba(77,141,255,0.35); }
+.ap-row.is-thinking[data-agent="resolver"] .ap-avatar { background: rgba(52, 211, 153, 0.18); color: var(--ap-res); box-shadow: 0 0 0 2px rgba(52,211,153,0.35); }
+.ap-row.is-thinking[data-agent="guardian"] .ap-avatar { background: rgba(229, 72, 77, 0.18);  color: var(--ap-grd); box-shadow: 0 0 0 2px rgba(229,72,77,0.35);  }
+.ap-row.is-thinking[data-agent="reporter"] .ap-avatar { background: rgba(182, 107, 255, 0.18); color: var(--ap-rep); box-shadow: 0 0 0 2px rgba(182,107,255,0.35); }
+
+.ap-row.is-active[data-agent="memory"]   { background: rgba(77, 141, 255, 0.10);  border-color: rgba(77, 141, 255, 0.30); }
+.ap-row.is-active[data-agent="memory"]   .ap-avatar { background: var(--ap-mem); color: white; box-shadow: 0 0 0 2px rgba(77,141,255,0.45); }
+.ap-row.is-active[data-agent="memory"]   .ap-status { color: rgba(255, 255, 255, 0.92); }
+
+.ap-row.is-active[data-agent="resolver"] { background: rgba(52, 211, 153, 0.10);  border-color: rgba(52, 211, 153, 0.30); }
+.ap-row.is-active[data-agent="resolver"] .ap-avatar { background: var(--ap-res); color: white; box-shadow: 0 0 0 2px rgba(52,211,153,0.45); }
+.ap-row.is-active[data-agent="resolver"] .ap-status { color: rgba(255, 255, 255, 0.92); }
+
+.ap-row.is-active[data-agent="guardian"] { background: rgba(229, 72, 77, 0.10);   border-color: rgba(229, 72, 77, 0.30); }
+.ap-row.is-active[data-agent="guardian"] .ap-avatar { background: var(--ap-grd); color: white; box-shadow: 0 0 0 2px rgba(229,72,77,0.45); }
+.ap-row.is-active[data-agent="guardian"] .ap-status { color: rgba(255, 255, 255, 0.92); }
+
+.ap-row.is-active[data-agent="reporter"] { background: rgba(182, 107, 255, 0.10); border-color: rgba(182, 107, 255, 0.30); }
+.ap-row.is-active[data-agent="reporter"] .ap-avatar { background: var(--ap-rep); color: white; box-shadow: 0 0 0 2px rgba(182,107,255,0.45); }
+.ap-row.is-active[data-agent="reporter"] .ap-status { color: rgba(255, 255, 255, 0.92); }
+
+.ap-row.is-thinking,
+.ap-row.is-active { opacity: 1; }
+
+/* Pulsing ring on the avatar while a row is "thinking". */
+.ap-row.is-thinking .ap-avatar::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: ap-pulse 1.4s ease-out infinite;
+}
+@keyframes ap-pulse {
+  0%   { transform: scale(0.85); opacity: 0.55; }
+  70%  { transform: scale(1.20); opacity: 0;    }
+  100% { transform: scale(1.20); opacity: 0;    }
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+.ap-footer {
+  min-height: 18px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  letter-spacing: 0.4px;
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+.ap-footer.is-shown { opacity: 1; }
+.ap-footer .check {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ap-res);
+  margin-left: 6px;
+  vertical-align: -2px;
+}

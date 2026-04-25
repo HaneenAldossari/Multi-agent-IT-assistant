@@ -149,6 +149,56 @@ export function createStreamWindow(
   return win;
 }
 
+/**
+ * <PROJECT_NAME> — the four-agent collaboration panel. Top-left of the
+ * primary display, transparent + frameless + always-on-top, never steals
+ * focus. Created hidden; main process calls .showInactive() each time a
+ * request begins, then sends SHOW_AGENT_PANEL so the renderer restarts
+ * its hard-coded animation timeline.
+ */
+export function createAgentPanelWindow(): BrowserWindow {
+  const primary = screen.getPrimaryDisplay();
+  const { workArea } = primary;
+  const width = 380;
+  const height = 480;
+  const gutter = 24;
+
+  const win = new BrowserWindow({
+    x: workArea.x + gutter,
+    y: workArea.y + gutter,
+    width,
+    height,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    transparent: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    focusable: false,
+    title: 'Sanad Agents',
+    webPreferences: {
+      preload: getPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  // 'screen-saver' is the highest always-on-top level — keeps the panel
+  // visible over fullscreen Terminal/Chrome the way Flicky's cursor
+  // overlay stays above everything.
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  loadPage(win, 'agent-panel');
+  return win;
+}
+
 function defaultStreamBounds(): StreamWindowBounds {
   const primary = screen.getPrimaryDisplay();
   const { workArea } = primary;

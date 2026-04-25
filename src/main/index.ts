@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, globalShortcut, screen, ipcMain, shell, nativeImage } from 'electron';
 import path from 'path';
 import { CompanionManager } from './companion-manager';
-import { createPanelWindow, createOverlayWindow, createStreamWindow } from './windows';
+import { createPanelWindow, createOverlayWindow, createStreamWindow, createAgentPanelWindow } from './windows';
 import { IPC, type StreamVisibility, type StreamWindowBounds } from '../shared/types';
 import { AUDIO_IPC } from './services/audio-capture';
 import * as chatHistory from './services/chat-history-store';
@@ -16,6 +16,8 @@ let tray: Tray | null = null;
 let panelWindow: BrowserWindow | null = null;
 let overlayWindows: BrowserWindow[] = [];
 let streamWindow: BrowserWindow | null = null;
+let agentPanelWindow: BrowserWindow | null = null;
+let agentPanelHideTimer: ReturnType<typeof setTimeout> | null = null;
 let companion: CompanionManager;
 let isAppQuitting = false;
 let lastVoiceState = 'idle';
@@ -125,6 +127,7 @@ app.whenReady().then(() => {
     onPlayAudio: (buf) => sendToOverlays('play-audio', buf),
     onCursorVisibilityChanged: (enabled) => applyOverlayVisibility(enabled),
     onStreamVisibilityChanged: (v) => applyStreamVisibility(v),
+    onAgentPanelShow: () => showAgentPanel(),
   });
 
   // Create tray
@@ -166,6 +169,17 @@ app.whenReady().then(() => {
     streamWindow.on('resized', persistStreamBounds);
     applyStreamVisibility(settings.streamVisibility);
   }
+
+  // <PROJECT_NAME> — Agent Collaboration Panel.
+  // Created hidden; surfaced each time companion.onAgentPanelShow fires.
+  agentPanelWindow = createAgentPanelWindow();
+  agentPanelWindow.on('close', (e) => {
+    if (!isAppQuitting) {
+      e.preventDefault();
+      agentPanelWindow?.hide();
+    }
+  });
+
 
   // Sync the OS login-item state with our stored preference. Handles
   // the case where the user disables the login item externally (e.g.
@@ -397,6 +411,26 @@ function updateStreamForVoiceState(state: string): void {
   } else if (state === 'idle') {
     streamWindow.hide();
   }
+}
+
+/**
+ * Show the agent panel and (re)start its 12-second animation timeline.
+ * Re-firing this while the panel is already visible is a feature: the
+ * renderer treats each SHOW_AGENT_PANEL event as a hard restart, mirroring
+ * Flicky's "new turn supersedes old turn" behavior elsewhere.
+ */
+function showAgentPanel(): void {
+  if (!agentPanelWindow || agentPanelWindow.isDestroyed()) return;
+  agentPanelWindow.showInactive();
+  agentPanelWindow.webContents.send(IPC.SHOW_AGENT_PANEL);
+  if (agentPanelHideTimer) clearTimeout(agentPanelHideTimer);
+  // 12s timeline + small tail for the fade-out.
+  agentPanelHideTimer = setTimeout(() => {
+    if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+      agentPanelWindow.hide();
+    }
+    agentPanelHideTimer = null;
+  }, 12500);
 }
 
 function persistStreamBounds(): void {

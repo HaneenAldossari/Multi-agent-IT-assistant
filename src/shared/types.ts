@@ -243,4 +243,9 @@ export const IPC = {
   SET_API_KEY: 'set-api-key',
   DELETE_API_KEY: 'delete-api-key',
   GET_API_KEY_STATUS: 'get-api-key-status',
+
+  // <PROJECT_NAME> — Agent Collaboration Panel (Main → Renderer broadcast).
+  // Fires every time a new request begins; renderer treats each fire as a
+  // hard restart of the animation timeline.
+  SHOW_AGENT_PANEL: 'show-agent-panel',
 } as const;
