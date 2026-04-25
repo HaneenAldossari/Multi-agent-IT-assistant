@@ -285,6 +285,14 @@ export function OverlayApp() {
 
   return (
     <div className="overlay-container">
+      {/* Always visible while the mic is hot, regardless of which display
+          the cursor is on. Demo-quality "the mic is recording" signal. */}
+      {voiceState === 'listening' && (
+        <div className="rec-badge" dir="rtl" lang="ar">
+          <span className="rec-dot" aria-hidden="true" />
+          <span>يسجّل... تكلّم الآن</span>
+        </div>
+      )}
       {showOnThisDisplay && (
         <>
           <div

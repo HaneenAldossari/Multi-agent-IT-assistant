@@ -55,6 +55,57 @@
   to { transform: rotate(360deg); }
 }
 
+/* ── Recording Badge ────────────────────────────────────────────────────
+ * Fixed-position indicator that the mic is hot. Top-center of every
+ * display. Shown only while voiceState === 'listening'.
+ * ──────────────────────────────────────────────────────────────────── */
+
+.rec-badge {
+  position: fixed;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px 9px 14px;
+  background: rgba(20, 22, 24, 0.84);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid rgba(229, 72, 77, 0.55);
+  border-radius: 999px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 0 4px rgba(229, 72, 77, 0.10);
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  pointer-events: none;
+  animation: rec-fade-in 180ms ease-out;
+}
+
+.rec-badge .rec-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #E5484D;
+  box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.8);
+  animation: rec-pulse 1.2s ease-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.7); transform: scale(1); }
+  70%  { box-shadow: 0 0 0 10px rgba(229, 72, 77, 0); transform: scale(1.05); }
+  100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0); transform: scale(1); }
+}
+
+@keyframes rec-fade-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0);    }
+}
+
 /* ── Pointing Label Bubble ──────────────────────────────────────────── */
 
 .pointing-bubble {
