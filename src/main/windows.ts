@@ -80,8 +80,14 @@ export function createOverlayWindow(display: Display): BrowserWindow {
     },
   });
 
-  // Click-through: let mouse events pass to windows underneath
-  win.setIgnoreMouseEvents(true, { forward: true });
+  // Click-through. forward:true (Flicky's original) hands mouse events to
+  // the underlying window — but on macOS Sonoma+ this combination of
+  // transparent+fullscreen+forwarded-mouse causes the window server to
+  // skip compositing the overlay against non-Electron focused apps. Using
+  // forward:false keeps the click-through behavior (we never read mouse
+  // events here anyway — main polls screen.getCursorScreenPoint) AND
+  // preserves correct painting.
+  win.setIgnoreMouseEvents(true, { forward: false });
 
   // Keep overlay above everything
   win.setAlwaysOnTop(true, 'screen-saver');

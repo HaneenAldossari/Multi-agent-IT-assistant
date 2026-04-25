@@ -155,6 +155,7 @@ app.whenReady().then(() => {
   screen.on('display-added', rebuildOverlays);
   screen.on('display-removed', rebuildOverlays);
 
+
   // Create the transparent stream window (hidden until the user opts in).
   {
     const settings = companion.getSettings();
@@ -200,6 +201,7 @@ app.whenReady().then(() => {
   });
 
 
+
   // Sync the OS login-item state with our stored preference. Handles
   // the case where the user disables the login item externally (e.g.
   // via System Settings) — next launch reconciles the two.
@@ -227,6 +229,7 @@ app.whenReady().then(() => {
   let currentShortcut = '';
 
   const pttHandler = () => {
+    console.log(`[Sanad] PTT shortcut fired, isRecording=${pttIsRecording}`);
     if (!pttIsRecording) {
       pttIsRecording = true;
       companion.startPushToTalk();

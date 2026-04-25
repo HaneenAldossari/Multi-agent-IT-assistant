@@ -1,4 +1,4 @@
-import { app, systemPreferences } from 'electron';
+import { app, screen, systemPreferences } from 'electron';
 import { ClaudeAPI } from './services/claude-api';
 import { OpenAIAPI } from './services/openai-api';
 import { ElevenLabsTTS } from './services/elevenlabs-tts';
@@ -478,10 +478,20 @@ export class CompanionManager {
     };
 
     // ── <PROJECT_NAME> integration boundary (Phase 1 / Day-1 stub) ──────
-    // Real handleUserRequest() with 4 agents (Memory, Resolver, Guardian,
-    // Reporter) replaces this in Phase 2 per Integration Spec §5.1.
-    // For the Day-1 checkpoint we only need to prove the wiring is intact:
-    //   PTT → transcription → screenshot → THIS STUB → cursor overlay + TTS
+    // Hard-coded VPN-scenario response for the proposal-phase demo video.
+    // Real handleUserRequest() with 4 agents replaces this in Phase 2 per
+    // Integration Spec §5.1.
+    //
+    // Sequence per demo script:
+    //   1. Open the agent-collaboration panel — runs its own ~12s timeline
+    //   2. Wait for the panel to complete its animation
+    //   3. Stream the hard-coded Arabic Reporter message into the existing
+    //      Flicky panel/stream UI via mindCallbacks.onComplete
+    //   4. Fire the cursor target directly via callbacks.onElementDetected,
+    //      bypassing parsePointTags so the cursor flies regardless of
+    //      whether macOS Screen Recording permission was granted (i.e. even
+    //      if this.lastScreenshots is empty)
+    //
     // Honors abort + turnId so a new PTT press cleanly cancels mid-stub.
     void mindOptions;  // unused in stub; real orchestrator (Phase 2) consumes it
 
@@ -490,7 +500,10 @@ export class CompanionManager {
     // callback restarts it from t=0.
     this.callbacks.onAgentPanelShow();
 
-    const STUB_DELAY_MS = 2000;
+    // Match the panel's animation duration + the small fade tail so the
+    // cursor + final message land just as the panel finishes. The panel
+    // window is auto-hidden by main at +12.5s.
+    const STUB_DELAY_MS = 12500;
     let stubAborted = false;
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, STUB_DELAY_MS);
@@ -502,17 +515,29 @@ export class CompanionManager {
     });
 
     if (!stubAborted && isCurrent()) {
-      // Aim the mock cursor at the center of the active screen so we can
-      // visually verify the parsePointTags → CursorIcon path still works.
-      const firstScreen = this.lastScreenshots[0];
-      const centerX = Math.floor((firstScreen?.imageWidth ?? 800) / 2);
-      const centerY = Math.floor((firstScreen?.imageHeight ?? 600) / 2);
-      const mockReply =
-        `هذا رد تجريبي من <PROJECT_NAME>. الوكلاء الحقيقيون لم يُبنوا بعد. ` +
-        `[POINT:${centerX},${centerY}:منتصف الشاشة:screen0]`;
+      // Hard-coded VPN demo response. This is what the real Reporter agent
+      // would return in Phase 2 after Memory + Resolver + Guardian negotiate.
+      const finalMessage =
+        'هذا خطأ مصادقة شائع. اضغط على Disconnect ثم سجّل دخول مرة ثانية ' +
+        'بكلمة المرور الحالية. الموضوع يأخذ أقل من دقيقة.';
 
-      mindCallbacks.onChunk(mockReply);
-      await mindCallbacks.onComplete(mockReply);
+      mindCallbacks.onChunk(finalMessage);
+      await mindCallbacks.onComplete(finalMessage);
+
+      // Direct cursor fire using primary-display coordinates. We deliberately
+      // skip the [POINT:...] tag + parsePointTags path so the demo works
+      // whether or not screen capture succeeded. The 6s auto-clear timer
+      // inside onComplete still runs and returns the cursor to follow-mouse
+      // after the user has had time to see it.
+      if (isCurrent()) {
+        const primary = screen.getPrimaryDisplay();
+        this.callbacks.onElementDetected({
+          x: primary.bounds.x + Math.floor(primary.bounds.width / 2),
+          y: primary.bounds.y + Math.floor(primary.bounds.height / 2),
+          label: 'اضغط هنا لإعادة المصادقة',
+          screenIndex: 0,
+        });
+      }
     }
     // ── end <PROJECT_NAME> integration boundary ─────────────────────────
 

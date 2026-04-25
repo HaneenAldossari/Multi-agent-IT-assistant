@@ -231,7 +231,10 @@ export function OverlayApp() {
             holdTimerRef.current = null;
           }
 
-          setPointingPhrase(randomPhrase());
+          // Prefer the agent's own Arabic label when present so the demo
+          // bubble matches the surrounding RTL UI; fall back to Flicky's
+          // random English phrase only when the label is missing.
+          setPointingPhrase(el.label?.trim() || randomPhrase());
           setDetectedElement(el);
 
           const bounds = displayRef.current?.bounds;
