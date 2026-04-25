@@ -254,4 +254,10 @@ export const IPC = {
   SHOW_REC_PILL: 'show-rec-pill',
   HIDE_REC_PILL: 'hide-rec-pill',
   REC_PILL_AUDIO_LEVEL: 'rec-pill-audio-level',
+
+  // <PROJECT_NAME> — dedicated target-cursor window. Replaces the original
+  // fullscreen-transparent overlay path which macOS Sonoma+ refuses to
+  // composite over non-Electron focused apps. Small windows composite fine.
+  SHOW_TARGET_CURSOR: 'show-target-cursor',
+  HIDE_TARGET_CURSOR: 'hide-target-cursor',
 } as const;

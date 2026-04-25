@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanad Cursor</title>
+</head>
+<body>
+  <div class="tc-root" id="root">
+    <div class="tc-triangle" id="triangle">
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="tc-fill" x1="10%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#e0f2fe" />
+            <stop offset="50%" stop-color="#7dd3fc" />
+            <stop offset="100%" stop-color="#2563eb" />
+          </linearGradient>
+        </defs>
+        <polygon points="4,4 34,14 14,32" fill="url(#tc-fill)"
+                 stroke="url(#tc-fill)" stroke-width="3" stroke-linejoin="round" />
+        <polyline points="4,4 34,14" fill="none" stroke="rgba(255,255,255,0.65)"
+                  stroke-width="1.4" stroke-linecap="round" />
+        <polyline points="4,4 14,32" fill="none" stroke="rgba(255,255,255,0.4)"
+                  stroke-width="1" stroke-linecap="round" />
+      </svg>
+    </div>
+    <div class="tc-bubble" id="bubble"></div>
+  </div>
+  <script type="module" src="./target-cursor.ts"></script>
+</body>
+</html>

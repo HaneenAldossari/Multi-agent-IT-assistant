@@ -20,6 +20,7 @@ export default defineConfig({
         stream: path.resolve(__dirname, 'src/renderer/stream.html'),
         agentPanel: path.resolve(__dirname, 'src/renderer/agent-panel.html'),
         recPill: path.resolve(__dirname, 'src/renderer/rec-pill.html'),
+        targetCursor: path.resolve(__dirname, 'src/renderer/target-cursor.html'),
       },
     },
   },

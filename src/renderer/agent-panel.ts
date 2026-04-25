@@ -50,20 +50,27 @@ function resetAll(): void {
   root.classList.remove('is-visible');
 }
 
+// Status-only labels (no in-character chat). Each agent has a "pulsing"
+// label while thinking and the same label with a check mark when done —
+// reads like a CI pipeline / antivirus scan, not a dialogue.
+const LABEL = {
+  memory:   'البحث في السجل...',
+  resolver: 'تحليل الشاشة...',
+  guardian: 'مراجعة السياسات...',
+  reporter: 'تجهيز الرد...',
+} as const;
+const DONE = ' ✓'; // non-breaking space + check
+
 const TIMELINE: Step[] = [
   { at:    50, run: () => root.classList.add('is-visible') },
-  { at:   500, run: () => { startThinking('memory');   setStatus('memory',   'يبحث في السجل...'); } },
-  { at:  2500, run: () => setMessage('memory',
-      'شفت بلاغين سابقين بنفس المشكلة. الحل المعروف: إعادة المصادقة بعد تغيير كلمة المرور.') },
-  { at:  3000, run: () => { startThinking('resolver'); setStatus('resolver', 'يفحص الشاشة...'); } },
-  { at:  5000, run: () => setMessage('resolver',
-      'أرى رسالة Authentication failed. هذي مشكلة بيانات اعتماد. اقترح إعادة المصادقة.') },
-  { at:  5500, run: () => { startThinking('guardian'); setStatus('guardian', 'يراجع السياسات...'); } },
-  { at:  6500, run: () => setMessage('guardian',
-      'لا يحتاج مراجعة — إعادة مصادقة بحساب نفس المستخدم آمنة.') },
-  { at:  7000, run: () => { startThinking('reporter'); setStatus('reporter', 'يجمّع الرد النهائي...'); } },
-  { at:  9000, run: () => setMessage('reporter',
-      'الرد جاهز للموظف. المؤشر يشير على زر Disconnect.') },
+  { at:   500, run: () => { startThinking('memory');   setStatus('memory',   LABEL.memory); } },
+  { at:  2500, run: () => setMessage('memory',   LABEL.memory   + DONE) },
+  { at:  3000, run: () => { startThinking('resolver'); setStatus('resolver', LABEL.resolver); } },
+  { at:  5000, run: () => setMessage('resolver', LABEL.resolver + DONE) },
+  { at:  5500, run: () => { startThinking('guardian'); setStatus('guardian', LABEL.guardian); } },
+  { at:  6500, run: () => setMessage('guardian', LABEL.guardian + DONE) },
+  { at:  7000, run: () => { startThinking('reporter'); setStatus('reporter', LABEL.reporter); } },
+  { at:  9000, run: () => setMessage('reporter', LABEL.reporter + DONE) },
   { at: 11000, run: () => {
       footer.innerHTML = 'اكتمل<span class="check"></span>';
       footer.classList.add('is-shown');

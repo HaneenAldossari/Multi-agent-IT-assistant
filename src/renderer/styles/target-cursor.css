@@ -1,0 +1,101 @@
+/* ── <PROJECT_NAME> Target-cursor floating window ──────────────────────
+ * A small transparent capsule that holds the blue cursor triangle plus
+ * a labelled bubble. Sized to its content; main process positions the
+ * BrowserWindow directly over the target screen coordinates.
+ * ──────────────────────────────────────────────────────────────────── */
+
+html, body {
+  background: transparent !important;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+  user-select: none;
+}
+
+.tc-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* ── Cursor triangle ────────────────────────────────────────────────── */
+.tc-triangle {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  margin-top: 6px;
+  filter:
+    drop-shadow(0 6px 14px rgba(29, 78, 216, 0.6))
+    drop-shadow(0 0 24px rgba(59, 130, 246, 0.55));
+  transform: scale(0) rotate(-12deg);
+  opacity: 0;
+  transition:
+    transform 540ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 240ms ease-out;
+  will-change: transform, opacity;
+}
+.tc-triangle svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.tc-root.is-active .tc-triangle {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  /* Tiny continuous bob so the cursor doesn't feel frozen during the hold */
+  animation: tc-bob 2.4s ease-in-out 540ms infinite;
+}
+@keyframes tc-bob {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50%      { transform: scale(1) translateY(-3px); }
+}
+
+/* ── Label bubble ───────────────────────────────────────────────────── */
+.tc-bubble {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  padding: 8px 14px 9px;
+  background: rgba(37, 99, 235, 0.96);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 14px 36px rgba(29, 78, 216, 0.5),
+    0 0 0 4px rgba(59, 130, 246, 0.18);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px) scale(0.94);
+  transition:
+    opacity 220ms ease-out 360ms,
+    transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1) 360ms;
+}
+.tc-root.is-active .tc-bubble {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Pulsing ring around the triangle while holding */
+.tc-triangle::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 211, 252, 0.55);
+  opacity: 0;
+}
+.tc-root.is-active .tc-triangle::after {
+  animation: tc-pulse 1.6s ease-out 600ms 3;
+}
+@keyframes tc-pulse {
+  0%   { transform: scale(0.85); opacity: 0.7; }
+  70%  { transform: scale(1.6);  opacity: 0;   }
+  100% { transform: scale(1.6);  opacity: 0;   }
+}

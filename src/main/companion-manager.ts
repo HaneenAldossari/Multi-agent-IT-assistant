@@ -29,6 +29,124 @@ import type {
   StreamWindowBounds,
 } from '../shared/types';
 
+// ── <PROJECT_NAME> proposal-phase OpenAI vision call ─────────────────────
+//
+// PROPOSAL PHASE ONLY. Per docs/02-FLICKY-INTEGRATION-SPEC.md the locked
+// stack is Claude Sonnet + 4 specialized agents + RAG + ChromaDB. For the
+// proposal demo we make a single gpt-4o vision call and dress it up with
+// the visual agent panel — restored to the locked stack during hackathon
+// implementation.
+
+const SANAD_SYSTEM_PROMPT = `أنت مساعد دعم تقني للموظفين السعوديين. مهمتك:
+
+1. تحليل لقطة الشاشة المُرفقة لفهم التطبيق المفتوح والمشكلة الظاهرة
+2. الاستماع لسؤال المستخدم بالعربية
+3. تقديم حل عملي مختصر بالعربية الفصحى مع المصطلحات التقنية بالإنجليزية كما يستخدمها الموظف السعودي طبيعياً
+4. تحديد إحداثيات الزر أو العنصر الذي يجب الضغط عليه لحل المشكلة
+
+أجب دائماً بصيغة JSON بهذا الشكل بالضبط، بدون أي نص إضافي قبله أو بعده:
+
+{
+  "response_arabic": "الرد العربي للمستخدم في 1-3 جمل قصيرة",
+  "cursor_x": <رقم صحيح>,
+  "cursor_y": <رقم صحيح>,
+  "cursor_label": "نص عربي قصير (3-6 كلمات) يصف ما يفعله هذا الزر"
+}
+
+قواعد صارمة:
+- الرد يجب أن يكون موجهاً مباشرة للمستخدم بصيغة المخاطب (أنت/اضغط/تأكد)
+- لا تذكر أبداً كلمات: "وكلاء"، "ذكاء اصطناعي"، "نموذج"، "AI"، "system"
+- اقترح حلاً واحداً فقط، الأبسط والأسرع
+- إحداثيات المؤشر يجب أن تكون داخل أبعاد الصورة المُرفقة بالضبط
+- إذا لم تستطع تحديد زر محدد، استخدم منتصف منطقة الحل الأقرب
+- المصطلحات التقنية (VPN, password, Send/Receive, Settings) تبقى بالإنجليزية
+- استخدم ال (التعريف) لربط الكلمات الإنجليزية: "الـ VPN"، "الـ password"
+
+مثال على رد صحيح:
+{
+  "response_arabic": "اضغط على زر Send/Receive في الشريط العلوي لتحديث الإيميل. إذا استمرت المشكلة، تأكد من اتصال الإنترنت.",
+  "cursor_x": 245,
+  "cursor_y": 89,
+  "cursor_label": "زر Send/Receive لتحديث الإيميل"
+}`;
+
+interface SanadVisionResult {
+  response_arabic: string;
+  cursor_x: number;
+  cursor_y: number;
+  cursor_label: string;
+}
+
+async function runSanadOpenAIVision(
+  apiKey: string,
+  transcript: string,
+  screenshot: ScreenCapture,
+  signal: AbortSignal,
+): Promise<SanadVisionResult | null> {
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal,
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: SANAD_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: transcript },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${screenshot.dataBase64}`,
+                  detail: 'high',
+                },
+              },
+            ],
+          },
+        ],
+        response_format: { type: 'json_object' },
+        max_tokens: 700,
+        temperature: 0.2,
+      }),
+    });
+
+    if (!res.ok) {
+      console.error('[Sanad] OpenAI vision call failed:', res.status, await res.text());
+      return null;
+    }
+
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      console.error('[Sanad] OpenAI returned no content');
+      return null;
+    }
+
+    const parsed = JSON.parse(content) as Partial<SanadVisionResult>;
+    if (
+      typeof parsed.response_arabic !== 'string' ||
+      typeof parsed.cursor_x !== 'number' ||
+      typeof parsed.cursor_y !== 'number' ||
+      typeof parsed.cursor_label !== 'string'
+    ) {
+      console.error('[Sanad] OpenAI returned malformed JSON:', parsed);
+      return null;
+    }
+    return parsed as SanadVisionResult;
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'AbortError' || signal.aborted)) {
+      return null;
+    }
+    console.error('[Sanad] OpenAI vision call threw:', err);
+    return null;
+  }
+}
+
 export interface CompanionCallbacks {
   onVoiceStateChanged: (state: VoiceState) => void;
   onTranscriptUpdate: (result: TranscriptionResult) => void;
@@ -381,11 +499,13 @@ export class CompanionManager {
     this.callbacks.onTranscriptUpdate(result);
     analytics.trackUserMessageSent(result.text);
 
+    console.log(`[Sanad] transcript ok, length=${result.text.length}`);
     this.setVoiceState('processing');
     try {
       this.lastScreenshots = await captureAllDisplays();
+      console.log(`[Sanad] captured ${this.lastScreenshots.length} screen(s)`);
     } catch (err) {
-      console.error('Screen capture failed:', err);
+      console.error('[Sanad] Screen capture failed:', err);
       this.lastScreenshots = [];
     }
 
@@ -498,7 +618,26 @@ export class CompanionManager {
     // Kick off the visual agent-collaboration panel (demo theater). The
     // panel runs its own ~12s animation independently — re-firing the
     // callback restarts it from t=0.
+    console.log(`[Sanad] stub: opening agent panel, turnId=${myTurnId}`);
     this.callbacks.onAgentPanelShow();
+
+    // Kick off the OpenAI vision call in parallel with the panel animation.
+    // Single gpt-4o call, returns JSON {response_arabic, cursor_x, cursor_y,
+    // cursor_label}. If the user has no OpenAI key set or the call fails,
+    // openaiPromise resolves to null and we use the hardcoded VPN fallback.
+    const openaiKey = keyStore.getApiKey('openai');
+    const visionScreenshot = this.lastScreenshots[0];
+    const openaiPromise: Promise<SanadVisionResult | null> =
+      openaiKey && visionScreenshot
+        ? runSanadOpenAIVision(openaiKey, result.text, visionScreenshot, abort.signal)
+        : Promise.resolve(null);
+    if (!openaiKey) {
+      console.log('[Sanad] no OpenAI key configured — will use hardcoded fallback');
+    } else if (!visionScreenshot) {
+      console.log('[Sanad] no screenshot captured — will use hardcoded fallback');
+    } else {
+      console.log('[Sanad] OpenAI vision call dispatched in parallel with panel');
+    }
 
     // Match the panel's animation duration + the small fade tail so the
     // cursor + final message land just as the panel finishes. The panel
@@ -514,29 +653,57 @@ export class CompanionManager {
       });
     });
 
-    if (!stubAborted && isCurrent()) {
-      // Hard-coded VPN demo response. This is what the real Reporter agent
-      // would return in Phase 2 after Memory + Resolver + Guardian negotiate.
-      const finalMessage =
-        'هذا خطأ مصادقة شائع. اضغط على Disconnect ثم سجّل دخول مرة ثانية ' +
-        'بكلمة المرور الحالية. الموضوع يأخذ أقل من دقيقة.';
+    if (stubAborted || !isCurrent()) {
+      console.log(`[Sanad] stub: aborted before delivery, stubAborted=${stubAborted}, isCurrent=${isCurrent()}`);
+    } else {
+      // Wait for the OpenAI call to settle (or fall back). It usually
+      // finishes well before the 12.5s panel timeline, so this awaits
+      // immediately. If gpt-4o is slow today, the user sees a brief
+      // post-panel pause — acceptable for a proposal demo.
+      const visionResult = await openaiPromise;
 
-      mindCallbacks.onChunk(finalMessage);
-      await mindCallbacks.onComplete(finalMessage);
+      let finalMessage: string;
+      let cursorTarget: { x: number; y: number; label: string; screenIndex: number };
 
-      // Direct cursor fire using primary-display coordinates. We deliberately
-      // skip the [POINT:...] tag + parsePointTags path so the demo works
-      // whether or not screen capture succeeded. The 6s auto-clear timer
-      // inside onComplete still runs and returns the cursor to follow-mouse
-      // after the user has had time to see it.
-      if (isCurrent()) {
+      if (visionResult && visionScreenshot) {
+        // Real OpenAI output. Transform image-pixel coords back into the
+        // display coordinate space the cursor overlay expects.
+        const sx = visionScreenshot.displayBounds.width / visionScreenshot.imageWidth;
+        const sy = visionScreenshot.displayBounds.height / visionScreenshot.imageHeight;
+        finalMessage = visionResult.response_arabic;
+        cursorTarget = {
+          x: Math.round(visionScreenshot.displayBounds.x + visionResult.cursor_x * sx),
+          y: Math.round(visionScreenshot.displayBounds.y + visionResult.cursor_y * sy),
+          label: visionResult.cursor_label,
+          screenIndex: 0,
+        };
+        console.log(
+          `[Sanad] stub: using OpenAI response, cursor ${visionResult.cursor_x},${visionResult.cursor_y}` +
+          ` (image px) → ${cursorTarget.x},${cursorTarget.y} (display)`,
+        );
+      } else {
+        // Fallback: hardcoded VPN scenario response. Triggered when the
+        // user hasn't set an OpenAI key, the call failed, or the model
+        // returned malformed JSON.
+        finalMessage =
+          'هذا خطأ مصادقة شائع. اضغط على Disconnect ثم سجّل دخول مرة ثانية ' +
+          'بكلمة المرور الحالية. الموضوع يأخذ أقل من دقيقة.';
         const primary = screen.getPrimaryDisplay();
-        this.callbacks.onElementDetected({
+        cursorTarget = {
           x: primary.bounds.x + Math.floor(primary.bounds.width / 2),
           y: primary.bounds.y + Math.floor(primary.bounds.height / 2),
           label: 'اضغط هنا لإعادة المصادقة',
           screenIndex: 0,
-        });
+        };
+        console.log('[Sanad] stub: using hardcoded VPN fallback');
+      }
+
+      mindCallbacks.onChunk(finalMessage);
+      await mindCallbacks.onComplete(finalMessage);
+
+      if (isCurrent()) {
+        console.log(`[Sanad] stub: firing cursor at ${cursorTarget.x},${cursorTarget.y}`);
+        this.callbacks.onElementDetected(cursorTarget);
       }
     }
     // ── end <PROJECT_NAME> integration boundary ─────────────────────────

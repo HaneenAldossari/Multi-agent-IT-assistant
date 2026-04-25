@@ -221,6 +221,7 @@ export function OverlayApp() {
         }
       }),
       window.flicky.onElementDetected((el) => {
+        console.log(`[Sanad/overlay] onElementDetected: ${el ? 'el at ' + el.x + ',' + el.y : 'null'}`);
         if (el) {
           if (returnAnimRef.current) {
             cancelAnimationFrame(returnAnimRef.current);

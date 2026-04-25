@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, globalShortcut, screen, ipcMain, shell, nativeImage } from 'electron';
 import path from 'path';
 import { CompanionManager } from './companion-manager';
-import { createPanelWindow, createOverlayWindow, createStreamWindow, createAgentPanelWindow, createRecPillWindow } from './windows';
+import { createPanelWindow, createOverlayWindow, createStreamWindow, createAgentPanelWindow, createRecPillWindow, createTargetCursorWindow } from './windows';
 import { IPC, type StreamVisibility, type StreamWindowBounds } from '../shared/types';
 import { AUDIO_IPC } from './services/audio-capture';
 import * as chatHistory from './services/chat-history-store';
@@ -20,6 +20,8 @@ let agentPanelWindow: BrowserWindow | null = null;
 let agentPanelHideTimer: ReturnType<typeof setTimeout> | null = null;
 let recPillWindow: BrowserWindow | null = null;
 let recPillHideTimer: ReturnType<typeof setTimeout> | null = null;
+let targetCursorWindow: BrowserWindow | null = null;
+let targetCursorHideTimer: ReturnType<typeof setTimeout> | null = null;
 let companion: CompanionManager;
 let isAppQuitting = false;
 let lastVoiceState = 'idle';
@@ -121,7 +123,13 @@ app.whenReady().then(() => {
       sendToPanel(IPC.AI_RESPONSE_COMPLETE, text);
       sendToStream(IPC.AI_RESPONSE_COMPLETE, text);
     },
-    onElementDetected: (el) => sendToOverlays(IPC.ELEMENT_DETECTED, el),
+    onElementDetected: (el) => {
+      sendToOverlays(IPC.ELEMENT_DETECTED, el);
+      // Drive the dedicated target-cursor window in parallel — small
+      // floating windows composite correctly on macOS Sonoma+ where the
+      // fullscreen overlay does not.
+      updateTargetCursor(el);
+    },
     onSettingsChanged: (s) => sendToPanel(IPC.SETTINGS_CHANGED, s),
     onMemoryStatsChanged: (stats) => sendToPanel(IPC.MEMORY_STATS, stats),
     onChatEntryAdded: (entry) => sendToPanel(IPC.CHAT_ENTRY_ADDED, entry),
@@ -154,6 +162,14 @@ app.whenReady().then(() => {
   rebuildOverlays();
   screen.on('display-added', rebuildOverlays);
   screen.on('display-removed', rebuildOverlays);
+
+  // Diagnostic only — pipes overlay renderer console.log to main stdout so
+  // we can see what the cursor receives during a live PTT flow.
+  for (const win of overlayWindows) {
+    win.webContents.on('console-message', (_e, level, message) => {
+      console.log(`[overlay-console L${level}] ${message}`);
+    });
+  }
 
 
   // Create the transparent stream window (hidden until the user opts in).
@@ -197,6 +213,16 @@ app.whenReady().then(() => {
   ipcMain.on('audio-level', (_e, level: number) => {
     if (recPillWindow && !recPillWindow.isDestroyed() && recPillWindow.isVisible()) {
       recPillWindow.webContents.send(IPC.REC_PILL_AUDIO_LEVEL, level);
+    }
+  });
+
+  // <PROJECT_NAME> — Target cursor window. Stays mapped between requests;
+  // we only move + show/hide it in updateTargetCursor.
+  targetCursorWindow = createTargetCursorWindow();
+  targetCursorWindow.on('close', (e) => {
+    if (!isAppQuitting) {
+      e.preventDefault();
+      targetCursorWindow?.hide();
     }
   });
 
@@ -468,6 +494,52 @@ function showAgentPanel(): void {
     }
     agentPanelHideTimer = null;
   }, 12500);
+}
+
+/**
+ * Move + show / hide the dedicated target-cursor window. A non-null
+ * element positions the window so the triangle's tip lands on the target
+ * coordinate, then animates the cursor in. A null element hides it.
+ *
+ * The original fullscreen overlay still receives the same event (for
+ * mouse-following and Flicky's existing animations); this path is purely
+ * additive and is what actually shows up in real screen recordings on
+ * macOS Sonoma+.
+ */
+function updateTargetCursor(el: { x: number; y: number; label: string } | null): void {
+  if (!targetCursorWindow || targetCursorWindow.isDestroyed()) return;
+  if (el) {
+    if (targetCursorHideTimer) {
+      clearTimeout(targetCursorHideTimer);
+      targetCursorHideTimer = null;
+    }
+    const [w, h] = targetCursorWindow.getSize();
+    // Triangle is in the leading edge of the window content. Anchor the
+    // window so the triangle's visual tip lands on (el.x, el.y) — the
+    // triangle is ~56px and sits at the start of the row with ~14px
+    // margin-top, so we offset slightly up-left from the target.
+    const x = Math.round(el.x - 14);
+    const y = Math.round(el.y - 14);
+    // Clamp to the display we're on so the bubble doesn't fall offscreen.
+    const display = screen.getDisplayNearestPoint({ x: el.x, y: el.y });
+    const maxX = display.bounds.x + display.bounds.width - w - 8;
+    const maxY = display.bounds.y + display.bounds.height - h - 8;
+    targetCursorWindow.setBounds({
+      x: Math.max(display.bounds.x + 8, Math.min(maxX, x)),
+      y: Math.max(display.bounds.y + 8, Math.min(maxY, y)),
+      width: w,
+      height: h,
+    });
+    targetCursorWindow.showInactive();
+    targetCursorWindow.webContents.send(IPC.SHOW_TARGET_CURSOR, el.label);
+  } else {
+    targetCursorWindow.webContents.send(IPC.HIDE_TARGET_CURSOR);
+    if (targetCursorHideTimer) clearTimeout(targetCursorHideTimer);
+    targetCursorHideTimer = setTimeout(() => {
+      if (targetCursorWindow && !targetCursorWindow.isDestroyed()) targetCursorWindow.hide();
+      targetCursorHideTimer = null;
+    }, 320);
+  }
 }
 
 /**

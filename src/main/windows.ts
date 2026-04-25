@@ -206,6 +206,51 @@ export function createAgentPanelWindow(): BrowserWindow {
 }
 
 /**
+ * <PROJECT_NAME> — Target-cursor window. A small transparent capsule
+ * that flies to a screen position and holds, with a labelled bubble.
+ * Replaces the original fullscreen-transparent overlay path because
+ * macOS Sonoma+ refuses to composite fullscreen-transparent windows
+ * over non-Electron focused apps. Small windows composite reliably.
+ */
+export function createTargetCursorWindow(): BrowserWindow {
+  const width = 380;
+  const height = 90;
+
+  const win = new BrowserWindow({
+    x: 0,
+    y: 0,
+    width,
+    height,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    transparent: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    focusable: false,
+    title: 'Sanad Pointer',
+    webPreferences: {
+      preload: getPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  win.setIgnoreMouseEvents(true, { forward: false });
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  loadPage(win, 'target-cursor');
+  return win;
+}
+
+/**
  * <PROJECT_NAME> — Wispr-style recording pill. A small floating capsule
  * anchored to the bottom-center of the primary display. Created hidden;
  * shown when voiceState transitions to 'listening', hidden otherwise.
