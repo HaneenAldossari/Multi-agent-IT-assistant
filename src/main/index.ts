@@ -209,29 +209,44 @@ app.whenReady().then(() => {
     console.error('[Flicky] initial setLoginItemSettings failed:', err);
   }
 
-  // Register global push-to-talk shortcut.
-  // globalShortcut fires repeatedly on key-repeat while held, so we
-  // debounce: the first press starts recording, subsequent repeats are
-  // ignored, and we stop recording after the shortcut hasn't fired for
-  // a short window (meaning the key was released).
-  let pttDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let pttActive = false;
+  // <PROJECT_NAME> — toggle-mode push-to-talk.
+  //
+  // Flicky's original handler relied on Electron's globalShortcut firing
+  // repeatedly while the hotkey is held, then debounced "no repeat for
+  // 250ms" as the key-up signal. That doesn't work on macOS — Electron's
+  // globalShortcut fires once per press, ignoring key-repeat — so the
+  // debounce timer always expires ~250ms after press and stops the
+  // recording before the user has said anything.
+  //
+  // Switch to a toggle: first press starts recording, second press
+  // stops and processes. Better demo UX (no need to hold 3 keys while
+  // looking at the camera) and works identically across platforms.
+  // 30s auto-stop guards against a forgotten "still recording".
+  let pttIsRecording = false;
+  let pttSafetyTimer: ReturnType<typeof setTimeout> | null = null;
   let currentShortcut = '';
 
   const pttHandler = () => {
-    if (pttDebounceTimer) {
-      clearTimeout(pttDebounceTimer);
-      pttDebounceTimer = null;
-    }
-    if (!pttActive) {
-      pttActive = true;
+    if (!pttIsRecording) {
+      pttIsRecording = true;
       companion.startPushToTalk();
-    }
-    pttDebounceTimer = setTimeout(() => {
-      pttActive = false;
-      pttDebounceTimer = null;
+      if (pttSafetyTimer) clearTimeout(pttSafetyTimer);
+      pttSafetyTimer = setTimeout(() => {
+        if (pttIsRecording) {
+          console.log('[Sanad] PTT auto-stop after 30s');
+          pttIsRecording = false;
+          companion.stopPushToTalk();
+        }
+        pttSafetyTimer = null;
+      }, 30_000);
+    } else {
+      pttIsRecording = false;
+      if (pttSafetyTimer) {
+        clearTimeout(pttSafetyTimer);
+        pttSafetyTimer = null;
+      }
       companion.stopPushToTalk();
-    }, 250);
+    }
   };
 
   function registerPttShortcut(accelerator: string): boolean {
