@@ -1,67 +1,87 @@
-# Flicky
+# Sanad (سند)
 
-A voice-driven, screen-aware AI companion that lives in the corner of your screen. Hold a hotkey, talk to it, and a little blue cursor flies across your display to point at whatever it's referring to.
+> Voice-driven, screen-aware multi-agent IT support assistant — Arabic-first, built for Saudi enterprises.
+> Submission for **Agenticthon 2026, Track 2: Multi-Agent Systems.**
 
-> **Inspired by [Clicky](https://www.clicky.so/)** by [Farza](https://github.com/farzaa) ([github.com/farzaa/clicky](https://github.com/farzaa/clicky)).
-> Clicky is the original idea — a macOS-only Swift app. Flicky is an independent reimagining built from scratch in Electron so the same experience can run on **Windows, macOS, and Linux**. All credit for the original concept, the pointing-cursor interaction, and the "vibe" goes to Farza. If you're on a Mac, go check out the original — it's great.
-
----
-
-## What Flicky adds on top of the original idea
-
-- **Cross-platform** — Windows, macOS, and Linux from a single Electron codebase.
-- **A second reasoning provider** — pick between **Anthropic Claude** (Opus / Sonnet 4.6) and **OpenAI** (GPT-5, GPT-5 mini, GPT-4o) on the fly.
-- **More ElevenLabs voices** — full voice catalog, plus per-voice speed and stability sliders.
-- **Local chat history** — every conversation is stored on your machine, browsable from the panel, never uploaded.
-- **Long-running context management** — auto-compacts older messages into a summary near a configurable token budget so a single conversation can run forever without blowing up the context window.
-- **Customizable push-to-talk shortcut** — capture any key combination from the UI; the global shortcut re-registers live.
-- **Three transcription options** — Groq Whisper Large v3 / v3 Turbo with one-click switching.
-- **Multiple reasoning depths** — off / low / medium / high "extended thinking" toggle.
-- **Multi-display aware overlay** — the blue cursor follows your real mouse across monitors.
-- **Provider key management** — separate, encrypted local storage for each provider's API key with one-click validation.
-
-The core loop — hold the hotkey, ask anything, see the blue cursor point — is faithful to Farza's original.
+The employee holds a hotkey, describes a problem in Arabic, and Sanad captures the screen, reasons about it, and points the cursor at the fix with an Arabic label. Behind the scenes, four specialized agents — Memory, Resolver, Guardian, and Reporter — collaborate to produce the answer.
 
 ---
 
-## Running locally
+## Status
 
-Requires [Bun](https://bun.sh) (or npm) and Node 20+.
+**Proposal phase.** A single OpenAI gpt-4o vision call returns a real Arabic response and cursor coordinates over a real screenshot, dressed up by a four-agent visualization panel.
+
+**Hackathon phase.** The single call is replaced by the locked stack: four Claude Sonnet agents (Memory, Resolver, Guardian, Reporter) coordinated by a small TypeScript orchestrator, with a ChromaDB / Voyage AI RAG layer over past tickets and policy documents. Both phases share the same UI shell and Electron plumbing.
+
+## How it works
+
+1. Press the configured shortcut (default: `Ctrl + Cmd + X`)
+2. Speak in Arabic — describe what's wrong on screen
+3. Press the shortcut again to stop recording
+4. The agent panel animates while the model reasons about your screenshot
+5. A response appears in the streaming panel; a blue cursor flies to the suggested UI element with an Arabic label
+
+## Run locally
 
 ```bash
-bun install
-bun run dev
+npm install
+npm run build
+npm start
 ```
 
-That starts the TypeScript watcher for the main process and Vite for the renderer. Launch the Electron app from a separate terminal once the dev servers are up:
+Open the panel from the macOS menu bar tray icon. Configure keys:
+
+- **Ear** tab → Groq API key (required — used for Arabic Whisper transcription)
+- **Mind** tab → OpenAI key (proposal demo) or Anthropic key (hackathon phase)
+- **Voice** tab → ElevenLabs (optional, for spoken responses)
+
+Keys are stored locally via Electron's `safeStorage` (Keychain / DPAPI / libsecret).
+
+## Project layout
+
+```
+src/
+├── main/                    Electron main process
+│   ├── index.ts             tray, windows, IPC, global shortcuts
+│   ├── companion-manager.ts integration boundary — request lifecycle
+│   ├── windows.ts           five window factories (panel, overlay, stream,
+│   │                        agent-panel, rec-pill, target-cursor)
+│   └── services/            transcription, TTS, screen capture, key store
+├── renderer/
+│   ├── panel.tsx            main settings + chat panel (React)
+│   ├── overlay.tsx          fullscreen transparent overlay (cursor)
+│   ├── stream.tsx           live response window (React)
+│   ├── agent-panel.ts       four-agent collaboration animation (vanilla TS)
+│   ├── rec-pill.ts          Wispr-style recording pill (vanilla TS)
+│   └── target-cursor.ts     small floating cursor + Arabic label (vanilla TS)
+├── preload/index.ts         contextBridge — Main ↔ Renderer IPC
+└── shared/types.ts          shared TS types + IPC channel constants
+
+docs/
+└── pitch-deck.pptx          Agenticthon proposal deck (generated)
+
+scripts/
+└── build_pitch_deck.py      reproducible deck generator (python-pptx)
+```
+
+## Pitch deck
+
+The Agenticthon proposal deck lives at `docs/pitch-deck.pptx`. Don't edit it by hand — edit `scripts/build_pitch_deck.py` and re-run:
 
 ```bash
-bun run start
+pip install python-pptx
+python3 scripts/build_pitch_deck.py
 ```
 
-## Building installers
+## Built on Flicky
 
-```bash
-bun run package          # current platform
-bun run package:win      # Windows .exe (NSIS)
-bun run package:mac      # macOS .dmg + .zip (universal)
-bun run package:linux    # AppImage + .deb
-```
+Sanad is a fork of [Flicky by Jason Vaught](https://github.com/jvaught01/flicky), MIT-licensed. Flicky itself is an Electron reimagining of [Clicky by Farza](https://github.com/farzaa/clicky). All credit for the original desktop-companion-cursor pattern, the pointing interaction, and the underlying mechanics goes to them. Sanad's contribution is the multi-agent orchestration layer, Arabic-first UX, and Saudi-enterprise context (NCA-compliant audit trail).
 
-Releases are also produced automatically by GitHub Actions on every `v*` tag — see [`.github/workflows/build.yml`](.github/workflows/build.yml).
+## Team
 
-## Configuration
-
-You'll need API keys for the providers you want to use:
-
-- **Anthropic** or **OpenAI** — reasoning
-- **ElevenLabs** — text-to-speech
-- **Groq** — speech-to-text
-
-Add them in the panel under **Mind**, **Voice**, and **Ear**. Keys are stored locally with platform-appropriate encryption — they never leave your machine except in API calls to the relevant provider.
+- **Haneen Aldossari** — CS student at PSAU
+- **Noura Aldossari** — CS student at PSAU
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
-The original Clicky project is the intellectual seed for this work; Flicky is an independent implementation and does not bundle or redistribute Clicky's source. If you like what's here, please also star [Farza's repo](https://github.com/farzaa/clicky).
+MIT, inherited from Flicky. See [LICENSE](LICENSE).
