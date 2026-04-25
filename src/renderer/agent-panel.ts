@@ -1,4 +1,4 @@
-// <PROJECT_NAME> — Agent Collaboration Panel renderer.
+// Multi-Agent IT Assistant — Agent Collaboration Panel renderer.
 // Pure visual demo: hard-coded Arabic message timeline triggered by an
 // IPC event from the main process. No React, no real agent data.
 // Each `show-agent-panel` event resets state and restarts the timeline.

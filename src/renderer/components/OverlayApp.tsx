@@ -98,7 +98,7 @@ export function OverlayApp() {
           }
           window.flicky.sendAudioChunk(pcm16.buffer);
 
-          // <PROJECT_NAME> — push the per-tick RMS to the recording pill.
+          // Multi-Agent IT Assistant — push the per-tick RMS to the recording pill.
           // ~21Hz at 16kHz/4096 buffer; cheap enough to send raw.
           const rms = Math.sqrt(sumSq / float32.length);
           window.flicky.sendAudioLevel?.(rms);
@@ -221,7 +221,7 @@ export function OverlayApp() {
         }
       }),
       window.flicky.onElementDetected((el) => {
-        console.log(`[Sanad/overlay] onElementDetected: ${el ? 'el at ' + el.x + ',' + el.y : 'null'}`);
+        console.log(`[Multi-Agent/overlay] onElementDetected: ${el ? 'el at ' + el.x + ',' + el.y : 'null'}`);
         if (el) {
           if (returnAnimRef.current) {
             cancelAnimationFrame(returnAnimRef.current);

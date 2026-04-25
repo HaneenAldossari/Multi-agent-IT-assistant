@@ -1,4 +1,4 @@
-// <PROJECT_NAME> — Wispr-style recording pill renderer.
+// Multi-Agent IT Assistant — Wispr-style recording pill renderer.
 // Vanilla TS. Subscribes to show/hide + live audio-level IPC events
 // from main and animates a waveform in real time.
 

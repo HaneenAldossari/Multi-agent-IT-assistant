@@ -1,4 +1,4 @@
-// <PROJECT_NAME> — Target-cursor renderer.
+// Multi-Agent IT Assistant — Target-cursor renderer.
 // Vanilla TS. Listens for SHOW_TARGET_CURSOR / HIDE_TARGET_CURSOR from main
 // and animates the triangle + bubble in/out. Main process owns positioning
 // (it moves the BrowserWindow itself to the target screen coordinates) and

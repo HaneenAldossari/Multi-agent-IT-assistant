@@ -1,9 +1,9 @@
-# Sanad (سند)
+# Multi-Agent IT Assistant
 
-> Voice-driven, screen-aware multi-agent IT support assistant — Arabic-first, built for Saudi enterprises.
+> المساعد التقني متعدد الوكلاء — voice-driven, screen-aware IT support, Arabic-first, built for Saudi enterprises.
 > Submission for **Agenticthon 2026, Track 2: Multi-Agent Systems.**
 
-The employee holds a hotkey, describes a problem in Arabic, and Sanad captures the screen, reasons about it, and points the cursor at the fix with an Arabic label. Behind the scenes, four specialized agents — Memory, Resolver, Guardian, and Reporter — collaborate to produce the answer.
+The employee holds a hotkey, describes a problem in Arabic, and the assistant captures the screen, reasons about it, and points the cursor at the fix with an Arabic label. Behind the scenes, four specialized agents — Memory, Resolver, Guardian, and Reporter — collaborate to produce the answer.
 
 ---
 
@@ -75,7 +75,7 @@ python3 scripts/build_pitch_deck.py
 
 ## Built on Flicky
 
-Sanad is a fork of [Flicky by Jason Vaught](https://github.com/jvaught01/flicky), MIT-licensed. Flicky itself is an Electron reimagining of [Clicky by Farza](https://github.com/farzaa/clicky). All credit for the original desktop-companion-cursor pattern, the pointing interaction, and the underlying mechanics goes to them. Sanad's contribution is the multi-agent orchestration layer, Arabic-first UX, and Saudi-enterprise context (NCA-compliant audit trail).
+This project is a fork of [Flicky by Jason Vaught](https://github.com/jvaught01/flicky), MIT-licensed. Flicky itself is an Electron reimagining of [Clicky by Farza](https://github.com/farzaa/clicky). All credit for the original desktop-companion-cursor pattern, the pointing interaction, and the underlying mechanics goes to them. The contribution here is the multi-agent orchestration layer, Arabic-first UX, and Saudi-enterprise context (NCA-compliant audit trail).
 
 ## Team
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-<PROJECT_NAME> — Agenticthon Proposal Pitch Deck Generator
+Multi-Agent IT Assistant — Agenticthon Proposal Pitch Deck Generator
 ==========================================================
 Generates docs/pitch-deck.pptx via python-pptx. Reproducible — run from
 the repo root:
@@ -369,7 +369,7 @@ def slide_how(prs):
         ("Capture", "التقاط",
          "لقطة شاشة + تحويل صوت لنص",
          "Screenshot + voice-to-text"),
-        ("Agents Collaborate", "وكلاء سند يتعاونون",
+        ("Agents Collaborate", "الوكلاء يتعاونون",
          "Memory → Resolver → Guardian → Reporter", ""),
         ("Response", "الاستجابة",
          "رد عربي + المؤشر يطير على الحل",

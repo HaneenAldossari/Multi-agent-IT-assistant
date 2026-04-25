@@ -141,14 +141,14 @@ const api = {
     return () => ipcRenderer.removeListener(IPC.CLEAR_STREAM, handler);
   },
 
-  // <PROJECT_NAME> — Agent panel restart trigger.
+  // Multi-Agent IT Assistant — Agent panel restart trigger.
   onAgentPanelShow: (cb: () => void) => {
     const handler = () => cb();
     ipcRenderer.on(IPC.SHOW_AGENT_PANEL, handler);
     return () => ipcRenderer.removeListener(IPC.SHOW_AGENT_PANEL, handler);
   },
 
-  // <PROJECT_NAME> — Target cursor (small floating window).
+  // Multi-Agent IT Assistant — Target cursor (small floating window).
   onShowTargetCursor: (cb: (label: string) => void) => {
     const handler = (_e: Electron.IpcRendererEvent, label: string) => cb(label);
     ipcRenderer.on(IPC.SHOW_TARGET_CURSOR, handler);
@@ -160,7 +160,7 @@ const api = {
     return () => ipcRenderer.removeListener(IPC.HIDE_TARGET_CURSOR, handler);
   },
 
-  // <PROJECT_NAME> — Wispr-style recording pill bridge.
+  // Multi-Agent IT Assistant — Wispr-style recording pill bridge.
   onShowRecPill: (cb: () => void) => {
     const handler = () => cb();
     ipcRenderer.on(IPC.SHOW_REC_PILL, handler);

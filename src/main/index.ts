@@ -190,7 +190,7 @@ app.whenReady().then(() => {
     applyStreamVisibility(settings.streamVisibility);
   }
 
-  // <PROJECT_NAME> — Agent Collaboration Panel.
+  // Multi-Agent IT Assistant — Agent Collaboration Panel.
   // Created hidden; surfaced each time companion.onAgentPanelShow fires.
   agentPanelWindow = createAgentPanelWindow();
   agentPanelWindow.on('close', (e) => {
@@ -200,7 +200,7 @@ app.whenReady().then(() => {
     }
   });
 
-  // <PROJECT_NAME> — Wispr-style recording pill. Created hidden; surfaced
+  // Multi-Agent IT Assistant — Wispr-style recording pill. Created hidden; surfaced
   // when voiceState transitions to 'listening'. Audio-level frames flow
   // through here from overlay → main → pill renderer.
   recPillWindow = createRecPillWindow();
@@ -216,7 +216,7 @@ app.whenReady().then(() => {
     }
   });
 
-  // <PROJECT_NAME> — Target cursor window. Stays mapped between requests;
+  // Multi-Agent IT Assistant — Target cursor window. Stays mapped between requests;
   // we only move + show/hide it in updateTargetCursor.
   targetCursorWindow = createTargetCursorWindow();
   targetCursorWindow.on('close', (e) => {
@@ -237,7 +237,7 @@ app.whenReady().then(() => {
     console.error('[Flicky] initial setLoginItemSettings failed:', err);
   }
 
-  // <PROJECT_NAME> — toggle-mode push-to-talk.
+  // Multi-Agent IT Assistant — toggle-mode push-to-talk.
   //
   // Flicky's original handler relied on Electron's globalShortcut firing
   // repeatedly while the hotkey is held, then debounced "no repeat for
@@ -255,14 +255,14 @@ app.whenReady().then(() => {
   let currentShortcut = '';
 
   const pttHandler = () => {
-    console.log(`[Sanad] PTT shortcut fired, isRecording=${pttIsRecording}`);
+    console.log(`[Multi-Agent] PTT shortcut fired, isRecording=${pttIsRecording}`);
     if (!pttIsRecording) {
       pttIsRecording = true;
       companion.startPushToTalk();
       if (pttSafetyTimer) clearTimeout(pttSafetyTimer);
       pttSafetyTimer = setTimeout(() => {
         if (pttIsRecording) {
-          console.log('[Sanad] PTT auto-stop after 30s');
+          console.log('[Multi-Agent] PTT auto-stop after 30s');
           pttIsRecording = false;
           companion.stopPushToTalk();
         }

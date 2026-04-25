@@ -29,7 +29,7 @@ import type {
   StreamWindowBounds,
 } from '../shared/types';
 
-// ── <PROJECT_NAME> proposal-phase OpenAI vision call ─────────────────────
+// ── Multi-Agent IT Assistant proposal-phase OpenAI vision call ─────────────────────
 //
 // PROPOSAL PHASE ONLY. Per docs/02-FLICKY-INTEGRATION-SPEC.md the locked
 // stack is Claude Sonnet + 4 specialized agents + RAG + ChromaDB. For the
@@ -37,7 +37,7 @@ import type {
 // the visual agent panel — restored to the locked stack during hackathon
 // implementation.
 
-const SANAD_SYSTEM_PROMPT = `أنت مساعد دعم تقني للموظفين السعوديين. مهمتك:
+const SYSTEM_PROMPT = `أنت مساعد دعم تقني للموظفين السعوديين. مهمتك:
 
 1. تحليل لقطة الشاشة المُرفقة لفهم التطبيق المفتوح والمشكلة الظاهرة
 2. الاستماع لسؤال المستخدم بالعربية
@@ -70,19 +70,19 @@ const SANAD_SYSTEM_PROMPT = `أنت مساعد دعم تقني للموظفين 
   "cursor_label": "زر Send/Receive لتحديث الإيميل"
 }`;
 
-interface SanadVisionResult {
+interface VisionResult {
   response_arabic: string;
   cursor_x: number;
   cursor_y: number;
   cursor_label: string;
 }
 
-async function runSanadOpenAIVision(
+async function runOpenAIVision(
   apiKey: string,
   transcript: string,
   screenshot: ScreenCapture,
   signal: AbortSignal,
-): Promise<SanadVisionResult | null> {
+): Promise<VisionResult | null> {
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -94,7 +94,7 @@ async function runSanadOpenAIVision(
       body: JSON.stringify({
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: SANAD_SYSTEM_PROMPT },
+          { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
             content: [
@@ -116,33 +116,33 @@ async function runSanadOpenAIVision(
     });
 
     if (!res.ok) {
-      console.error('[Sanad] OpenAI vision call failed:', res.status, await res.text());
+      console.error('[Multi-Agent] OpenAI vision call failed:', res.status, await res.text());
       return null;
     }
 
     const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
-      console.error('[Sanad] OpenAI returned no content');
+      console.error('[Multi-Agent] OpenAI returned no content');
       return null;
     }
 
-    const parsed = JSON.parse(content) as Partial<SanadVisionResult>;
+    const parsed = JSON.parse(content) as Partial<VisionResult>;
     if (
       typeof parsed.response_arabic !== 'string' ||
       typeof parsed.cursor_x !== 'number' ||
       typeof parsed.cursor_y !== 'number' ||
       typeof parsed.cursor_label !== 'string'
     ) {
-      console.error('[Sanad] OpenAI returned malformed JSON:', parsed);
+      console.error('[Multi-Agent] OpenAI returned malformed JSON:', parsed);
       return null;
     }
-    return parsed as SanadVisionResult;
+    return parsed as VisionResult;
   } catch (err) {
     if (err instanceof Error && (err.name === 'AbortError' || signal.aborted)) {
       return null;
     }
-    console.error('[Sanad] OpenAI vision call threw:', err);
+    console.error('[Multi-Agent] OpenAI vision call threw:', err);
     return null;
   }
 }
@@ -162,7 +162,7 @@ export interface CompanionCallbacks {
   onCursorVisibilityChanged: (enabled: boolean) => void;
   onStreamVisibilityChanged: (v: StreamVisibility) => void;
   /**
-   * <PROJECT_NAME> — fired at the start of every request so the agent
+   * Multi-Agent IT Assistant — fired at the start of every request so the agent
    * collaboration panel restarts its (currently hard-coded) animation
    * timeline. Will become real agent events once the orchestrator lands.
    */
@@ -499,13 +499,13 @@ export class CompanionManager {
     this.callbacks.onTranscriptUpdate(result);
     analytics.trackUserMessageSent(result.text);
 
-    console.log(`[Sanad] transcript ok, length=${result.text.length}`);
+    console.log(`[Multi-Agent] transcript ok, length=${result.text.length}`);
     this.setVoiceState('processing');
     try {
       this.lastScreenshots = await captureAllDisplays();
-      console.log(`[Sanad] captured ${this.lastScreenshots.length} screen(s)`);
+      console.log(`[Multi-Agent] captured ${this.lastScreenshots.length} screen(s)`);
     } catch (err) {
-      console.error('[Sanad] Screen capture failed:', err);
+      console.error('[Multi-Agent] Screen capture failed:', err);
       this.lastScreenshots = [];
     }
 
@@ -597,7 +597,7 @@ export class CompanionManager {
       signal: abort.signal,
     };
 
-    // ── <PROJECT_NAME> integration boundary (Phase 1 / Day-1 stub) ──────
+    // ── Multi-Agent IT Assistant integration boundary (Phase 1 / Day-1 stub) ──────
     // Hard-coded VPN-scenario response for the proposal-phase demo video.
     // Real handleUserRequest() with 4 agents replaces this in Phase 2 per
     // Integration Spec §5.1.
@@ -618,7 +618,7 @@ export class CompanionManager {
     // Kick off the visual agent-collaboration panel (demo theater). The
     // panel runs its own ~12s animation independently — re-firing the
     // callback restarts it from t=0.
-    console.log(`[Sanad] stub: opening agent panel, turnId=${myTurnId}`);
+    console.log(`[Multi-Agent] stub: opening agent panel, turnId=${myTurnId}`);
     this.callbacks.onAgentPanelShow();
 
     // Kick off the OpenAI vision call in parallel with the panel animation.
@@ -627,16 +627,16 @@ export class CompanionManager {
     // openaiPromise resolves to null and we use the hardcoded VPN fallback.
     const openaiKey = keyStore.getApiKey('openai');
     const visionScreenshot = this.lastScreenshots[0];
-    const openaiPromise: Promise<SanadVisionResult | null> =
+    const openaiPromise: Promise<VisionResult | null> =
       openaiKey && visionScreenshot
-        ? runSanadOpenAIVision(openaiKey, result.text, visionScreenshot, abort.signal)
+        ? runOpenAIVision(openaiKey, result.text, visionScreenshot, abort.signal)
         : Promise.resolve(null);
     if (!openaiKey) {
-      console.log('[Sanad] no OpenAI key configured — will use hardcoded fallback');
+      console.log('[Multi-Agent] no OpenAI key configured — will use hardcoded fallback');
     } else if (!visionScreenshot) {
-      console.log('[Sanad] no screenshot captured — will use hardcoded fallback');
+      console.log('[Multi-Agent] no screenshot captured — will use hardcoded fallback');
     } else {
-      console.log('[Sanad] OpenAI vision call dispatched in parallel with panel');
+      console.log('[Multi-Agent] OpenAI vision call dispatched in parallel with panel');
     }
 
     // Match the panel's animation duration + the small fade tail so the
@@ -654,7 +654,7 @@ export class CompanionManager {
     });
 
     if (stubAborted || !isCurrent()) {
-      console.log(`[Sanad] stub: aborted before delivery, stubAborted=${stubAborted}, isCurrent=${isCurrent()}`);
+      console.log(`[Multi-Agent] stub: aborted before delivery, stubAborted=${stubAborted}, isCurrent=${isCurrent()}`);
     } else {
       // Wait for the OpenAI call to settle (or fall back). It usually
       // finishes well before the 12.5s panel timeline, so this awaits
@@ -678,7 +678,7 @@ export class CompanionManager {
           screenIndex: 0,
         };
         console.log(
-          `[Sanad] stub: using OpenAI response, cursor ${visionResult.cursor_x},${visionResult.cursor_y}` +
+          `[Multi-Agent] stub: using OpenAI response, cursor ${visionResult.cursor_x},${visionResult.cursor_y}` +
           ` (image px) → ${cursorTarget.x},${cursorTarget.y} (display)`,
         );
       } else {
@@ -695,18 +695,18 @@ export class CompanionManager {
           label: 'اضغط هنا لإعادة المصادقة',
           screenIndex: 0,
         };
-        console.log('[Sanad] stub: using hardcoded VPN fallback');
+        console.log('[Multi-Agent] stub: using hardcoded VPN fallback');
       }
 
       mindCallbacks.onChunk(finalMessage);
       await mindCallbacks.onComplete(finalMessage);
 
       if (isCurrent()) {
-        console.log(`[Sanad] stub: firing cursor at ${cursorTarget.x},${cursorTarget.y}`);
+        console.log(`[Multi-Agent] stub: firing cursor at ${cursorTarget.x},${cursorTarget.y}`);
         this.callbacks.onElementDetected(cursorTarget);
       }
     }
-    // ── end <PROJECT_NAME> integration boundary ─────────────────────────
+    // ── end Multi-Agent IT Assistant integration boundary ─────────────────────────
 
     if (this.currentAbort === abort) this.currentAbort = null;
   }

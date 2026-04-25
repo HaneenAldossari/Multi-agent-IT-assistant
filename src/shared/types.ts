@@ -244,18 +244,18 @@ export const IPC = {
   DELETE_API_KEY: 'delete-api-key',
   GET_API_KEY_STATUS: 'get-api-key-status',
 
-  // <PROJECT_NAME> — Agent Collaboration Panel (Main → Renderer broadcast).
+  // Multi-Agent IT Assistant — Agent Collaboration Panel (Main → Renderer broadcast).
   // Fires every time a new request begins; renderer treats each fire as a
   // hard restart of the animation timeline.
   SHOW_AGENT_PANEL: 'show-agent-panel',
 
-  // <PROJECT_NAME> — Wispr-style recording pill (bottom-center of primary
+  // Multi-Agent IT Assistant — Wispr-style recording pill (bottom-center of primary
   // display, fades in/out with mic state, animates audio levels).
   SHOW_REC_PILL: 'show-rec-pill',
   HIDE_REC_PILL: 'hide-rec-pill',
   REC_PILL_AUDIO_LEVEL: 'rec-pill-audio-level',
 
-  // <PROJECT_NAME> — dedicated target-cursor window. Replaces the original
+  // Multi-Agent IT Assistant — dedicated target-cursor window. Replaces the original
   // fullscreen-transparent overlay path which macOS Sonoma+ refuses to
   // composite over non-Electron focused apps. Small windows composite fine.
   SHOW_TARGET_CURSOR: 'show-target-cursor',

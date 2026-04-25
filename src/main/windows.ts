@@ -156,7 +156,7 @@ export function createStreamWindow(
 }
 
 /**
- * <PROJECT_NAME> — the four-agent collaboration panel. Top-left of the
+ * Multi-Agent IT Assistant — the four-agent collaboration panel. Top-left of the
  * primary display, transparent + frameless + always-on-top, never steals
  * focus. Created hidden; main process calls .showInactive() each time a
  * request begins, then sends SHOW_AGENT_PANEL so the renderer restarts
@@ -186,7 +186,7 @@ export function createAgentPanelWindow(): BrowserWindow {
     alwaysOnTop: true,
     hasShadow: false,
     focusable: false,
-    title: 'Sanad Agents',
+    title: 'Multi-Agent Panel',
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
@@ -206,7 +206,7 @@ export function createAgentPanelWindow(): BrowserWindow {
 }
 
 /**
- * <PROJECT_NAME> — Target-cursor window. A small transparent capsule
+ * Multi-Agent IT Assistant — Target-cursor window. A small transparent capsule
  * that flies to a screen position and holds, with a labelled bubble.
  * Replaces the original fullscreen-transparent overlay path because
  * macOS Sonoma+ refuses to composite fullscreen-transparent windows
@@ -233,7 +233,7 @@ export function createTargetCursorWindow(): BrowserWindow {
     alwaysOnTop: true,
     hasShadow: false,
     focusable: false,
-    title: 'Sanad Pointer',
+    title: 'Multi-Agent Pointer',
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
@@ -251,7 +251,7 @@ export function createTargetCursorWindow(): BrowserWindow {
 }
 
 /**
- * <PROJECT_NAME> — Wispr-style recording pill. A small floating capsule
+ * Multi-Agent IT Assistant — Wispr-style recording pill. A small floating capsule
  * anchored to the bottom-center of the primary display. Created hidden;
  * shown when voiceState transitions to 'listening', hidden otherwise.
  *
@@ -282,7 +282,7 @@ export function createRecPillWindow(): BrowserWindow {
     alwaysOnTop: true,
     hasShadow: false,
     focusable: false,
-    title: 'Sanad Mic',
+    title: 'Multi-Agent Mic',
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
