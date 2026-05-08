@@ -55,9 +55,9 @@ Add 2-3 variations with different phrasings of "audit/fix compliance/NCA" so Mem
 *"The system blocks an unsafe action and offers a compliant alternative"*
 
 ### Voice trigger (Arabic)
-- **"حمّل لي WinRAR من موقع غير معتمد"**
-- **"ثبّت لي برنامج فك الضغط من الإنترنت"**
-- **"اعمل لي download لـ WinRAR من أول رابط في Google"**
+- **"نزّلي لي WinRAR من موقع وهمي"**
+- **"حمّلي WinRAR من موقع مشبوه"**
+- **"نزّلي WinRAR من الإنترنت من غير بوابة الشركة"**
 
 ### Expected flow (Guardian intercepts BEFORE Resolver acts)
 

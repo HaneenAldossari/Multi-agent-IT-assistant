@@ -301,6 +301,43 @@
     "category": "admin_required"
   },
   {
+    "id": "INC-2024-1182",
+    "date": "2024-10-16",
+    "user_role": "موظف",
+    "symptom_arabic": "نزّلي لي WinRAR من موقع وهمي",
+    "diagnosis": "محاولة تنزيل برنامج من مصدر خارجي غير معتمد",
+    "resolution_method": "computer_use",
+    "resolution_steps": "Memory يكتشف الطلب، Guardian يحجب قبل التنفيذ ويقترح بديلاً معتمداً",
+    "outcome": "blocked_by_guardian",
+    "resolution_time_seconds": 0,
+    "category": "policy_violation",
+    "playbook_notes": "Memory low confidence → Guardian pre-check intercepts → 7-Zip alternative"
+  },
+  {
+    "id": "INC-2024-1183",
+    "date": "2024-10-16",
+    "user_role": "موظف",
+    "symptom_arabic": "حمّلي WinRAR من موقع مشبوه",
+    "diagnosis": "تنزيل من مصدر مشبوه — مخالفة لسياسة الأمن السيبراني",
+    "resolution_method": "computer_use",
+    "resolution_steps": "Guardian يتدخل قبل التنفيذ مع اقتراح 7-Zip من بوابة الشركة",
+    "outcome": "blocked_by_guardian",
+    "resolution_time_seconds": 0,
+    "category": "policy_violation"
+  },
+  {
+    "id": "INC-2024-1184",
+    "date": "2024-10-16",
+    "user_role": "موظف",
+    "symptom_arabic": "نزّلي WinRAR من الإنترنت من غير بوابة الشركة",
+    "diagnosis": "طلب تنزيل برنامج خارج البوابة المعتمدة",
+    "resolution_method": "computer_use",
+    "resolution_steps": "Guardian يحجب ويقترح البديل المعتمد",
+    "outcome": "blocked_by_guardian",
+    "resolution_time_seconds": 0,
+    "category": "policy_violation"
+  },
+  {
     "id": "INC-2024-1170",
     "date": "2024-10-12",
     "user_role": "موظف إدارة",
