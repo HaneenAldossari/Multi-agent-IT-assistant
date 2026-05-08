@@ -124,7 +124,7 @@ for await (const m of query({
     : `[Voice transcript from employee — analyze and respond with JSON only]: ${userPrompt}`,
   options: {
     model: 'claude-sonnet-4-5',
-    maxTurns: 4,
+    maxTurns: 2,
     systemPrompt: MEMORY_PROMPT,
     mcpServers: { memory: memoryServer },
     allowedTools: ['mcp__memory__searchPastTickets'],
@@ -219,11 +219,18 @@ async function safeExec(cmd, okMsg, failPrefix) {
     const { stdout, stderr } = await execP(cmd);
     const out = (stdout + stderr).trim();
     if (/error|could not|failed|unable to find/i.test(out)) {
-      return { ok: false, message: `${failPrefix}: ${out.slice(0, 80)}` };
+      return { ok: false, message: `${failPrefix} → ${out}` };
     }
     return { ok: true, message: okMsg };
   } catch (err) {
-    return { ok: false, message: `${failPrefix}: ${err.message?.slice(0, 80)}` };
+    const msg = err.message ?? String(err);
+    // Detect "app not installed" specifically and surface a clear Arabic error
+    if (/unable to find application|application.*not found|-10810/i.test(msg)) {
+      const appMatch = msg.match(/'([^']+)'/);
+      const appName = appMatch ? appMatch[1] : 'التطبيق';
+      return { ok: false, message: `❌ التطبيق "${appName}" غير مثبَّت على هذا الجهاز. يجب تثبيته أولاً، أو اختيار تطبيق بديل.` };
+    }
+    return { ok: false, message: `${failPrefix} → ${msg}` };
   }
 }
 
@@ -318,7 +325,7 @@ async function runGuardianStage(action) {
     prompt: action,
     options: {
       model: 'claude-sonnet-4-5',
-      maxTurns: 4,
+      maxTurns: 2,
       systemPrompt: GUARD_PROMPT,
       mcpServers: { guardian: guardianServer },
       allowedTools: ['mcp__guardian__lookupPolicy'],

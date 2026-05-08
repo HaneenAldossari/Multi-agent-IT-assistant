@@ -217,7 +217,7 @@ export async function runMemoryAgent(
         : `[Voice transcript from employee — analyze and respond with JSON only]: ${transcript}`,
       options: {
         model: 'claude-sonnet-4-5',
-        maxTurns: 4,
+        maxTurns: 2,
         systemPrompt: SYSTEM_PROMPT,
         mcpServers: { memory: memoryServer as never },
         allowedTools: ['mcp__memory__searchPastTickets'],

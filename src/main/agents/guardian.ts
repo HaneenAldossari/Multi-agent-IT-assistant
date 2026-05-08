@@ -151,7 +151,7 @@ export async function runGuardianAgent(
       prompt: proposedActionArabic,
       options: {
         model: 'claude-sonnet-4-5',
-        maxTurns: 4,
+        maxTurns: 2,
         systemPrompt: SYSTEM_PROMPT,
         mcpServers: { guardian: guardianServer as never },
         allowedTools: ['mcp__guardian__lookupPolicy'],
