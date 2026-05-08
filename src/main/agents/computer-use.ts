@@ -46,6 +46,19 @@ User says "افتح Safari" → open Safari
 User says "غيّر الشبكة" → click menu-bar Wi-Fi icon, switch network
 User says "أعد تشغيل X" → quit app via cmd+q from menu, reopen via Spotlight
 
+User says "افحصي اتصال الإنترنت" / "ping" / "تشخيص الشبكة" → run a ping diagnostic in Terminal:
+  1. key("cmd+space")           → Spotlight
+  2. type("Terminal")
+  3. key("Return")               → Terminal opens
+  4. wait(1.5)                   → wait for prompt
+  5. type("ping -c 4 google.com")
+  6. key("Return")               → run command
+  7. wait(5)                     → wait for 4 ping replies (~4 seconds)
+  8. screenshot                  → READ the output
+  9. Final text in Arabic that quotes the actual measured average latency from the screenshot, e.g. "تم فحص الاتصال — 4 من 4 ردود، متوسط الزمن X ms. الشبكة سليمة."
+
+When reading ping output, look for the line "round-trip min/avg/max/stddev = X.X/Y.Y/..." — Y.Y is the average latency. If you see "Request timeout" or "0 packets received" the connection is broken — report that instead.
+
 ═══ ABSOLUTE RULES ═══
 
 - Iteration 1 of EVERY task MUST contain a tool_use call. No exceptions.
