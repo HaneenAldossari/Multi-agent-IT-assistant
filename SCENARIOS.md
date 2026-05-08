@@ -88,27 +88,31 @@ Memory should NOT have a high-confidence scripted match for "install software". 
 
 ---
 
-## Scenario C — Computer Use Exploration (Novel Problem)
-*"Resolver autonomously explores when Memory has no playbook"*
+## Scenario C — Network Diagnostic via Terminal (Computer Use)
+*"Resolver autonomously runs a real IT troubleshooting workflow"*
 
 ### Voice trigger (Arabic)
-- **"افتح Calculator"** *(simplest reliable demo)*
-- **"افتح الآلة الحاسبة"**
-- For a more impressive variant: **"افتح Notes واكتب لي عنوان اجتماع جديد"** *(but harder to land reliably)*
+- **"افحصي اتصال الإنترنت عبر ping"**
+- **"شغّلي ping على google من Terminal"**
+- **"اعمل تشخيص شبكة عبر ping"**
+
+### What it solves
+The single most common first step of any IT support call: "is your internet working — try pinging something." This is **what an IT technician does manually** when an employee complains of network issues. The agent does it autonomously and reports results in Arabic.
 
 ### Expected flow
 
 | Step | Agent | What happens | Time |
 |---|---|---|---|
-| 1 | Memory | Searches KB → no exact match for "open Calculator" (we deliberately removed it) → `recommendedPath: "computer_use"`, `confidence: 0.3`, `summaryArabic: "لم أجد سيناريو سابقاً مطابقاً — أوصي بالتحكم البصري للاستكشاف"` | ~3s |
-| 2 | Resolver | Enters Computer Use loop → actual macOS cursor visibly moves → cmd+space → types Calculator → Return → Calculator opens | ~20-25s |
-| 3 | Guardian | Reviews each Computer Use step → all approved (opening apps via Spotlight is policy-compliant under `NCA-OPN-1-T1-3`) | ~3s |
-| 4 | Reporter | "تم فتح Calculator" | ~1s |
+| 1 | Memory | Searches KB → no exact match for "ping diagnostic" → `recommendedPath: "computer_use"`, `confidence: 0.4`, summary "لم أجد سيناريو سابقاً مطابقاً — أوصي بالتحكم البصري لتشخيص الشبكة" | ~3s |
+| 2 | Resolver | Enters Computer Use loop: cmd+space → "Terminal" → Return → types `ping -c 4 google.com` → Return → reads output | ~20-25s |
+| 3 | Guardian | Reviews each step → all approved (running diagnostic commands in Terminal is policy-compliant) | ~3s |
+| 4 | Reporter | Reports the diagnostic result in Arabic, e.g. "الاتصال سليم — متوسط زمن الاستجابة 12ms" | ~1s |
 
 ### Memory ticket required (DELIBERATELY ABSENT)
-Memory should **not** have a strong scripted match for `openApp Calculator`. The point of this scenario is to demonstrate what happens when Memory has no playbook — Resolver explores autonomously. If Memory matches, the demo loses the "novel problem" angle.
-
-If Memory currently has a `scripted/openApp Calculator` ticket, **remove it** so this scenario routes to `computer_use`.
+Memory should **not** have a strong scripted match for "ping" / "network diagnostic". The point is to show novel-problem exploration. Memory should return:
+- `recommendedPath: "computer_use"` (NOT scripted, NOT escalate)
+- `confidence: ~0.3-0.5` (low — admitting it doesn't have a playbook)
+- `summaryArabic`: something like "لم أجد سيناريو سابقاً مطابقاً، يحتاج تحكّم بصري"
 
 ### Guardian policy required
 ```json
@@ -122,12 +126,26 @@ If Memory currently has a `scripted/openApp Calculator` ticket, **remove it** so
 ```
 
 ### What judges see
-- Memory pulses → "no past match, low confidence"
-- Resolver enters Computer Use → cursor visibly moves on screen
-- Spotlight opens, "Calculator" types out, Return pressed
-- Calculator window appears
-- Final report
-- Narrator: "*Memory had no playbook for this one. Watch the agent explore — it opens Spotlight like a human would, types the app name, presses enter. No pre-programmed recipe — pure agentic problem-solving.*"
+- Memory pulses → "no past match, recommending Computer Use"
+- Resolver enters Computer Use → cursor visibly opens Spotlight
+- Terminal launches in a visible window
+- Command `ping -c 4 google.com` types out character-by-character
+- Return pressed → ping output appears live (4 reply lines + average time)
+- Final Arabic report includes the actual measured latency
+- **Narrator:** "*This is the first thing every IT technician does — open Terminal, ping a known host, check response time. The agent did it without a script — just like a human IT engineer would. No pre-programmed recipe, real agentic problem-solving.*"
+
+### Voice trigger refinement for Memory matching
+Add 2-3 negative tickets so Memory routes vague network queries to Computer Use rather than escalating:
+
+```json
+{
+  "id": "INC-2024-1370",
+  "symptom_arabic": "تشخيص شبكة عبر terminal",
+  "resolution_method": "computer_use",
+  "category": "network_diagnostic",
+  "playbook_notes": "no scripted playbook — Resolver explores via Terminal+ping"
+}
+```
 
 ---
 

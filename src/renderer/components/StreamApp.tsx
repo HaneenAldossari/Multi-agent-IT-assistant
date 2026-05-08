@@ -118,7 +118,7 @@ export function StreamApp() {
   return (
     <div className="stream-root">
       <div className="stream-head">
-        <span className="title">Flicky · {statusLabel}</span>
+        <span className="title">IT Assistant · {statusLabel}</span>
         <button
           className="btn"
           title="Clear the on-screen stream (chat history is untouched)"
@@ -138,7 +138,7 @@ export function StreamApp() {
               <div className="stream-label">You</div>
               <div className="stream-user">{t.user}</div>
               <div className="stream-label" style={{ marginTop: 6 }}>
-                Flicky
+                IT Assistant
               </div>
               <div className="stream-ai">
                 {t.ai}
