@@ -1,5 +1,20 @@
 [
   {
+    "id": "INC-2024-1340",
+    "date": "2024-11-09",
+    "user_role": "محلل مالي",
+    "symptom_arabic": "تطبيق المالية الداخلي يعرض شاشة سوداء عند الفتح",
+    "diagnosis": "Process معلّق في الخلفية، cache التطبيق فاسد",
+    "resolution_method": "computer_use",
+    "resolution_steps": "إغلاق process من Activity Monitor، حذف cache، إعادة تشغيل التطبيق",
+    "outcome": "resolved",
+    "resolution_time_seconds": 28,
+    "category": "application_crash",
+    "playbook": "finance_app_black_screen",
+    "learned_by_agent": true,
+    "_demo_note": "Pre-seeded so that after the first Computer Use exploration, a second query about the same problem hits this and Memory routes with high confidence — demonstrates the 'Memory learning' narrative."
+  },
+  {
     "id": "INC-2024-1310",
     "date": "2024-11-08",
     "user_role": "موظف مالية",
