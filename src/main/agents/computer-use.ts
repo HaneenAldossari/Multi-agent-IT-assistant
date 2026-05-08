@@ -162,7 +162,13 @@ export async function runComputerUseLoop(input: ComputerUseInput): Promise<Compu
     }
     // Tiny inter-iteration delay so a long task (12+ iterations) doesn't
     // burst past the 30k tokens/min rate limit on tier-1 accounts.
-    if (i > 0) await new Promise((r) => setTimeout(r, 1500));
+    // Abort-aware so Escape doesn't have to wait through it.
+    if (i > 0) {
+      const wasAborted = await abortAwareSleep(1500, signal);
+      if (wasAborted) {
+        return { success: false, iterations: i, finalMessage: 'تم الإلغاء.', reason: 'aborted' };
+      }
+    }
     onStep?.(`الجولة ${i + 1}: يفكّر...`);
 
     // Prune older turns to stay under the per-minute input-token limit.
@@ -281,12 +287,17 @@ export async function runComputerUseLoop(input: ComputerUseInput): Promise<Compu
     // Execute every tool call sequentially and collect tool_results.
     const toolResults: unknown[] = [];
     for (const tu of toolUses) {
+      if (signal.aborted) {
+        return { success: false, iterations: i, finalMessage: 'تم الإلغاء.', reason: 'aborted' };
+      }
       const action = (tu.input?.action ?? '') as string;
-      onStep?.(describeAction(action, tu.input ?? {}));
+      const desc = describeAction(action, tu.input ?? {});
+      onStep?.(desc);
+      console.log(`[ComputerUse] iter ${i + 1}: ${desc}`);
 
       let resultBlock: { content: unknown; is_error?: boolean };
       try {
-        resultBlock = await executeAction(tu.input ?? {}, { imgW, imgH, dispBounds });
+        resultBlock = await executeAction(tu.input ?? {}, { imgW, imgH, dispBounds }, signal);
       } catch (err) {
         resultBlock = {
           content: `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -320,9 +331,21 @@ interface DisplayContext {
   dispBounds: { x: number; y: number; width: number; height: number };
 }
 
+async function abortAwareSleep(ms: number, signal: AbortSignal): Promise<boolean> {
+  // Polls every 100ms so Escape interrupts long waits instead of forcing
+  // the user to wait the full duration before the abort takes effect.
+  const ticks = Math.ceil(ms / 100);
+  for (let i = 0; i < ticks; i++) {
+    if (signal.aborted) return true;
+    await new Promise((r) => setTimeout(r, Math.min(100, ms - i * 100)));
+  }
+  return signal.aborted;
+}
+
 async function executeAction(
   input: Record<string, unknown>,
   ctx: DisplayContext,
+  signal: AbortSignal,
 ): Promise<{ content: unknown; is_error?: boolean }> {
   const action = (input.action ?? '') as string;
   const coord = input.coordinate as [number, number] | undefined;
@@ -396,11 +419,11 @@ async function executeAction(
 
     case 'wait': {
       // The computer_20250124 tool exposes a `wait` action; it expects the
-      // executor to actually pause. Without this, Claude's "wait for the
-      // app to launch" calls become no-ops and it spins.
+      // executor to actually pause. Wait abort-aware so Escape interrupts.
       const dur = Number((input.duration as number | undefined) ?? (text ? Number(text) : 1));
       const seconds = Number.isFinite(dur) ? Math.min(Math.max(dur, 0.5), 5) : 1.5;
-      await new Promise((r) => setTimeout(r, seconds * 1000));
+      const wasAborted = await abortAwareSleep(seconds * 1000, signal);
+      if (wasAborted) return { content: 'aborted', is_error: true };
       const cap = (await captureAllDisplays())[0];
       return cap
         ? { content: [imageBlock(downscaleBase64(cap.dataBase64, SCREENSHOT_MAX_DIM_FOR_API))] }

@@ -37,16 +37,42 @@ function emit(
   fn({ agent, status, text, timestamp: Date.now() });
 }
 
+// TEMP: TESTING MODE — when true, the orchestrator skips Memory and
+// Guardian entirely and runs Computer Use directly with the voice
+// transcript. Used during Resolver iteration. Set to false to restore
+// the full Memory → Resolver → Guardian pipeline.
+const RESOLVER_ONLY_MODE = true;
+
 export async function handleUserRequest(
   input: OrchestratorInput,
 ): Promise<OrchestratorOutput | null> {
   const { voiceTranscript, screenshot, anthropicKey, signal, onAgentMessage } = input;
 
-  // Multi-agent panel intentionally NOT shown right now — we are isolating
-  // Resolver to verify it works end-to-end before re-enabling Memory +
-  // Guardian visualization. Re-enable by un-commenting the line below.
-  //   input.onAgentPanelShow?.()  // not in current input shape; would re-wire
-  void onAgentMessage; // keep param for forward compat without firing it loudly
+  // ── Resolver-only fast path ──────────────────────────────────────────
+  if (RESOLVER_ONLY_MODE) {
+    console.log('[orchestrator] RESOLVER_ONLY_MODE — skipping Memory + Guardian');
+    emit(onAgentMessage, 'resolver', 'thinking', 'يبدأ التحكم بالشاشة...');
+    const cu = await runComputerUseLoop({
+      apiKey: anthropicKey,
+      transcript: voiceTranscript,
+      initialScreenshot: screenshot,
+      signal,
+      onStep: (msg) => emit(onAgentMessage, 'resolver', 'thinking', msg),
+    });
+    if (signal.aborted) return null;
+    emit(
+      onAgentMessage,
+      'resolver',
+      'done',
+      cu.success
+        ? `${cu.finalMessage} (${cu.iterations} جولة)`
+        : `لم يكتمل: ${cu.reason ?? 'unknown'}`,
+    );
+    return {
+      finalUserMessage: cu.finalMessage,
+      cursorTarget: null,
+    };
+  }
 
   // ── 1. Memory (real Claude Agent SDK call) ────────────────────────────
   emit(onAgentMessage, 'memory', 'thinking', 'يبحث في سجل البلاغات السابقة...');
