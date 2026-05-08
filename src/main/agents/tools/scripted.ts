@@ -7,6 +7,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { runNcaAudit } from './nca-audit';
 const execAsync = promisify(exec);
 
 export interface ScriptedResult {
@@ -86,6 +87,24 @@ export async function switchWifi(ssid: string, password?: string): Promise<Scrip
   }
 }
 
+/** Run NCA-ECC compliance audit on the device. */
+export async function ncaAudit(): Promise<ScriptedResult> {
+  try {
+    const report = await runNcaAudit();
+    return {
+      ok: true,
+      message: report.summaryArabic,
+      script: 'NCA-ECC compliance audit (5 checks)',
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: 'تعذّر إجراء التدقيق الأمني',
+      script: `nca-audit → ${err instanceof Error ? err.message : err}`,
+    };
+  }
+}
+
 /** Dispatch by tool name. Returns null if unknown tool. */
 export async function dispatchScripted(
   tool: string,
@@ -104,6 +123,10 @@ export async function dispatchScripted(
     case 'switchWifi':
     case 'switch_wifi':
       return switchWifi(args.ssid ?? args.network ?? '', args.password);
+    case 'ncaAudit':
+    case 'nca_audit':
+    case 'securityAudit':
+      return ncaAudit();
     default:
       return null;
   }

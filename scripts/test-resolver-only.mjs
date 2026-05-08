@@ -107,6 +107,22 @@ async function runScripted(toolName, a1, a2) {
     case 'mute':
       execSync(`osascript -e 'tell application "System Events" to key code 74'`);
       return { ok: true, message: 'تم كتم الصوت' };
+    case 'ncaAudit':
+    case 'securityAudit': {
+      // Inline NCA audit (matches src/main/agents/tools/nca-audit.ts behaviour)
+      console.log('🛡️  Running NCA-ECC compliance audit...\n');
+      const checks = await Promise.all([
+        runCheck('FileVault encryption', 'NCA-ECC-2-T4-1', `fdesetup status`, /FileVault is On/i),
+        runCheck('Screen lock password', 'NCA-ECC-2-T2-3', `defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0`, /^1$/m),
+        runCheck('Firewall', 'NCA-ECC-2-T5-1', `defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0`, /^[12]$/m),
+        runCheck('System updates', 'NCA-ECC-2-T6-2', `softwareupdate --list 2>&1`, /No new software available/i),
+        runCheck('Login password set', 'NCA-ECC-2-T2-1', `dscl . -read /Users/$(whoami) Password 2>/dev/null || echo unknown`, /Password:.+\S/),
+      ]);
+      const passes = checks.filter((c) => c.ok).length;
+      const lines = checks.map((c) => `${c.ok ? '✅' : '❌'} ${c.title} (${c.ref})`);
+      const summary = `\n${lines.join('\n')}\n\nنتيجة الامتثال: ${passes} / ${checks.length}`;
+      return { ok: passes === checks.length, message: summary };
+    }
     case 'openApp':
       return safeExec(`open -a "${safe(a1)}"`, `تم فتح ${a1}`, a1);
     case 'quitApp':
@@ -126,6 +142,15 @@ async function runScripted(toolName, a1, a2) {
     }
     default:
       return { ok: false, message: `Unknown tool: ${toolName}` };
+  }
+}
+
+async function runCheck(title, ref, cmd, passRegex) {
+  try {
+    const { stdout } = await execP(cmd);
+    return { title, ref, ok: passRegex.test(stdout) };
+  } catch {
+    return { title, ref, ok: false };
   }
 }
 
