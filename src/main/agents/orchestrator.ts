@@ -92,7 +92,14 @@ export async function handleUserRequest(
     memory.confidence >= 0.5
   ) {
     emit(onAgentMessage, 'resolver', 'thinking', `يستخدم سكريبت ${memory.scriptedTool}...`);
-    const scripted = await dispatchScripted(memory.scriptedTool, memory.scriptedArgs ?? {});
+    // Long-running scripted tools (like NCA audit-and-fix) get a step
+    // callback that pipes their progress into the agent panel — turns
+    // an otherwise-silent multi-second action into a narrated demo.
+    const scripted = await dispatchScripted(
+      memory.scriptedTool,
+      memory.scriptedArgs ?? {},
+      (stepText) => emit(onAgentMessage, 'resolver', 'thinking', stepText),
+    );
     if (scripted) {
       console.log(`[orchestrator] Scripted: tool=${memory.scriptedTool} ok=${scripted.ok} script="${scripted.script}"`);
       cu = {

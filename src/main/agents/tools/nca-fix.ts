@@ -112,36 +112,77 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
 
 // ── Main entry point ──────────────────────────────────────────────────
 
-export async function runNcaAuditAndFix(): Promise<AuditAndFixReport> {
-  // Phase 1: audit
-  const beforeReport = await runNcaAudit();
+/**
+ * Optional per-step callback so the agent panel can display each check
+ * and fix as it happens — turning the otherwise-instant 3-second audit
+ * into a visible, narrated 12-15 second demo.
+ */
+export type StepCallback = (text: string) => Promise<void> | void;
 
-  // Phase 2: for each failed/warn check, apply the appropriate remediation
+const STEP_PAUSE_MS = 700; // human-readable pacing between updates
+
+async function pause(ms: number): Promise<void> {
+  await new Promise((r) => setTimeout(r, ms));
+}
+
+export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAndFixReport> {
+  // Phase 1: audit (announce each check as it runs)
+  if (onStep) {
+    await onStep('بدء التدقيق الأمني وفق NCA-ECC...');
+    await pause(STEP_PAUSE_MS);
+  }
+  const beforeReport = await runNcaAudit();
+  if (onStep) {
+    for (const c of beforeReport.checks) {
+      const icon = c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚠️';
+      await onStep(`${icon} ${c.titleArabic} (${c.ncaRef})`);
+      await pause(STEP_PAUSE_MS);
+    }
+    await onStep(`النتيجة قبل المعالجة: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
+    await pause(STEP_PAUSE_MS);
+  }
+
+  // Phase 2: apply remediations
   const fixes: FixOutcome[] = [];
+  if (onStep && beforeReport.failCount + beforeReport.warnCount > 0) {
+    await onStep('بدء المعالجة التلقائية للعناصر الآمنة...');
+    await pause(STEP_PAUSE_MS);
+  }
   for (const check of beforeReport.checks) {
     if (check.status === 'pass') continue;
-
+    let outcome: FixOutcome;
     switch (check.id) {
       case 'screen_lock':
-        fixes.push(await fixScreenLock());
+        outcome = await fixScreenLock();
         break;
       case 'firewall':
-        fixes.push(await openFirewallSettings());
+        outcome = await openFirewallSettings();
         break;
       case 'os_updates':
-        fixes.push(await openSoftwareUpdate());
+        outcome = await openSoftwareUpdate();
         break;
       case 'filevault':
-        fixes.push(await openFileVaultSettings());
+        outcome = await openFileVaultSettings();
         break;
-      // password_policy: skip — likely false-fail from the dscl read
+      default:
+        continue;
+    }
+    fixes.push(outcome);
+    if (onStep) {
+      const icon = outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
+      await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
+      await pause(STEP_PAUSE_MS);
     }
   }
 
   // Small pause to let `defaults write` propagate before re-checking
-  await new Promise((r) => setTimeout(r, 800));
+  await pause(800);
 
   // Phase 3: re-audit
+  if (onStep) {
+    await onStep('إعادة التدقيق للتحقق من النتائج...');
+    await pause(STEP_PAUSE_MS);
+  }
   const afterReport = await runNcaAudit();
 
   // Build a bilingual summary of what changed
