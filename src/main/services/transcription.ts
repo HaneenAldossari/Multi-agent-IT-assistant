@@ -47,7 +47,13 @@ export class GroqWhisperProvider implements TranscriptionProvider {
     // Prime Whisper for Saudi/Khaleeji Arabic mixed with English IT-support terms
     // (WiFi, VPN, email, password, etc.). Letting language auto-detect per chunk
     // preserves English words verbatim instead of transliterating them.
-    formData.append('prompt', 'موظفة سعودية تتكلم عن مشكلة تقنية في العمل، تخلط بين العربية والإنجليزية: WiFi, VPN, password, email, network, screen, hotspot, server, laptop, browser.');
+    // Prime Whisper with Saudi-Arabic + the EXACT keywords used in our 3 demo
+    // scenarios. This biases the model toward our expected vocabulary
+    // (WinRAR, ping, NCA, etc.) so it doesn't mishear demo phrases.
+    formData.append(
+      'prompt',
+      'موظفة سعودية تتكلم عن مشكلة تقنية: نزّلي WinRAR من موقع وهمي مشبوه، 7-Zip بوابة الشركة، افحصي إعدادات الأمان NCA، تأكدي من اتصال الإنترنت ping، Terminal، Mail، Calculator، WiFi، VPN، password.',
+    );
     formData.append('temperature', '0');
 
     const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
