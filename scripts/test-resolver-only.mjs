@@ -266,7 +266,10 @@ async function executeAction(input) {
         const dx = Math.round(coordinate[0] * scale);
         const dy = Math.round(coordinate[1] * scale);
         try {
-          smoothClickViaPython(dx, dy);
+          // osascript click is reliable — System Events already has the
+          // permissions it needs in most user environments. The cursor
+          // teleports (visible jump) and the click fires.
+          execSync(`osascript -e 'tell application "System Events" to click at {${dx}, ${dy}}'`);
         } catch (e) { return { error: e.message }; }
       }
       await new Promise((r) => setTimeout(r, 400));
