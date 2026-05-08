@@ -53,6 +53,25 @@ console.log(`${'═'.repeat(60)}\n`);
 
 const overallStart = Date.now();
 
+// ── Pre-stage: foreground app context ────────────────────────────────
+// Memory uses this to disambiguate vague voice queries.
+let screenContext = null;
+if (IS_MAC) {
+  try {
+    const app = execSync(`osascript -e 'tell application "System Events" to name of first application process whose frontmost is true'`).toString().trim();
+    let title = '';
+    try {
+      title = execSync(`osascript -e 'tell application "System Events" to name of front window of (first application process whose frontmost is true)'`).toString().trim();
+    } catch { /* not all apps expose this */ }
+    if (app) {
+      screenContext = title && title !== app
+        ? `Foreground app: ${app} — window: ${title}`
+        : `Foreground app: ${app}`;
+      console.log(`📺 Screen context: ${screenContext}\n`);
+    }
+  } catch { /* osascript not available */ }
+}
+
 // ── Stage 1: Memory ────────────────────────────────────────────────────
 
 console.log('🧠 STAGE 1 — Memory');
@@ -77,17 +96,32 @@ const memoryServer = createSdkMcpServer({
   tools: [searchPastTickets],
 });
 
-const MEMORY_PROMPT = `أنت "وكيل الذاكرة". استخدم searchPastTickets، حلّل، وأوصِ بمسار:
-- "scripted" مع scriptedTool ("openApp"|"quitApp"|"restartApp"|"switchWifi") و scriptedArgs للمهام السهلة
-- "computer_use" للمهام المعقّدة
-- "escalate" للحالات التي صُعِّدت سابقاً
+const MEMORY_PROMPT = `You are an autonomous Memory agent. You analyze past tickets — you do NOT chat with the user.
 
-أجب بـ JSON فقط:
-{"similarTicketIds":[...],"recommendedPath":"...","scriptedTool":"...","scriptedArgs":{...},"confidence":0.0-1.0,"summaryArabic":"..."}`;
+ABSOLUTE RULES (no exceptions):
+1. NEVER ask the user questions.
+2. NEVER greet the user, introduce yourself, or be conversational.
+3. ALWAYS call searchPastTickets FIRST with keywords from the user input.
+4. ALWAYS respond with a single JSON object — nothing before, nothing after, no markdown.
+5. If you have nothing to search for, search with the literal user input.
+
+WHAT TO DECIDE:
+- "scripted" — past tickets show a known scripted fix worked
+  Set scriptedTool: "openApp" | "quitApp" | "restartApp" | "switchWifi"
+  Set scriptedArgs: e.g. {"name":"Microsoft Outlook"} or {"ssid":"Office-WiFi"}
+- "computer_use" — no clean scripted match, needs visual exploration
+- "escalate" — past similar tickets all escalated (password reset, install software, hardware)
+
+OUTPUT — exactly this JSON shape, nothing else:
+{"similarTicketIds":["INC-..."],"recommendedPath":"scripted|computer_use|escalate","scriptedTool":"...","scriptedArgs":{...},"confidence":0.0-1.0,"summaryArabic":"جملة عربية"}
+
+If recommendedPath is not "scripted", omit scriptedTool and scriptedArgs entirely.`;
 
 let memoryFinal = '';
 for await (const m of query({
-  prompt: userPrompt,
+  prompt: screenContext
+    ? `[Voice transcript from employee]: ${userPrompt}\n[Screen context]: ${screenContext}\n\nUse the screen context to disambiguate intent. Respond with JSON only.`
+    : `[Voice transcript from employee — analyze and respond with JSON only]: ${userPrompt}`,
   options: {
     model: 'claude-sonnet-4-5',
     maxTurns: 4,

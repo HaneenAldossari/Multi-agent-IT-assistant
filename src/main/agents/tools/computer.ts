@@ -147,6 +147,39 @@ export async function switchWifi(ssid: string, password?: string): Promise<{ ok:
 }
 
 /**
+ * Quick context extraction: returns the name + window title of the
+ * frontmost macOS app. Called by the orchestrator before invoking Memory
+ * so Memory can route correctly even when the user's voice is vague.
+ *
+ * Cheap (~100ms), text-only, no image processing.
+ */
+export async function getForegroundContext(): Promise<string | null> {
+  try {
+    const appName = (
+      await osa(
+        `tell application "System Events" to name of first application process whose frontmost is true`,
+      )
+    ).trim();
+    let windowTitle = '';
+    try {
+      windowTitle = (
+        await osa(
+          `tell application "System Events" to name of front window of (first application process whose frontmost is true)`,
+        )
+      ).trim();
+    } catch {
+      // Some apps don't expose window titles; that's fine.
+    }
+    if (!appName) return null;
+    return windowTitle && windowTitle !== appName
+      ? `Foreground app: ${appName} — window: ${windowTitle}`
+      : `Foreground app: ${appName}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check whether the app has macOS Accessibility permission. Without it,
  * clickAt/typeText/pressKey will silently no-op. The Computer Use loop
  * should call this once at startup and surface a clear error if it

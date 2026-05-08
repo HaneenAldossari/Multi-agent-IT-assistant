@@ -18,6 +18,7 @@ import { runGuardianAgent } from './guardian';
 import { runReporterAgent } from './reporter';
 import { runComputerUseLoop } from './computer-use';
 import { dispatchScripted } from './tools/scripted';
+import { getForegroundContext } from './tools/computer';
 
 export interface OrchestratorInput {
   voiceTranscript: string;
@@ -49,7 +50,12 @@ export async function handleUserRequest(
 
   // ── 1. Memory (real Claude Agent SDK call) ────────────────────────────
   emit(onAgentMessage, 'memory', 'thinking', 'يبحث في سجل البلاغات السابقة...');
-  const memory = await runMemoryAgent(voiceTranscript, anthropicKey);
+  // Pre-extract foreground app + window title so Memory can route even
+  // for vague voice queries like "هذا ما يشتغل". Cheap (~100ms),
+  // text-only, no image processing.
+  const screenContext = await getForegroundContext();
+  if (screenContext) console.log(`[orchestrator] ${screenContext}`);
+  const memory = await runMemoryAgent(voiceTranscript, anthropicKey, screenContext ?? undefined);
   if (signal.aborted) return null;
   emit(onAgentMessage, 'memory', 'active', memory.summaryArabic);
   console.log(`[orchestrator] Memory: path=${memory.recommendedPath} confidence=${memory.confidence}`);
