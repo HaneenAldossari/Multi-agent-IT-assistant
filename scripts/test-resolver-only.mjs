@@ -129,27 +129,39 @@ async function runScripted(toolName, a1, a2) {
   }
 }
 
-async function safeExec(cmd, okMsg, appHint) {
+async function safeExec(cmd, okMsg, hint) {
   try {
     const { stdout, stderr } = await execP(cmd);
     const out = (stdout + stderr).trim();
     if (/error|could not|failed|unable to find/i.test(out)) {
-      const isMissing = /unable to find application|-10810/i.test(out);
-      return {
-        ok: false,
-        message: isMissing
-          ? `❌ التطبيق "${appHint}" غير مثبَّت على هذا الجهاز`
-          : `Shell stderr: ${out}`,
-      };
+      return { ok: false, message: friendlyError(out, hint) };
     }
     return { ok: true, message: okMsg };
   } catch (err) {
     const msg = err.message ?? String(err);
-    if (/unable to find application|-10810/i.test(msg)) {
-      return { ok: false, message: `❌ التطبيق "${appHint}" غير مثبَّت على هذا الجهاز` };
-    }
-    return { ok: false, message: `Exec failed: ${msg}` };
+    return { ok: false, message: friendlyError(msg, hint) };
   }
+}
+
+function friendlyError(rawError, hint) {
+  // App not installed
+  if (/unable to find application|-10810/i.test(rawError)) {
+    return `❌ التطبيق "${hint}" غير مثبَّت على هذا الجهاز`;
+  }
+  // Wi-Fi: failed to join (-3900). Usually means: password not in
+  // Keychain, network out of range, or wrong encryption.
+  if (/-3900|failed to join network/i.test(rawError)) {
+    return `❌ تعذّر الاتصال بشبكة "${hint}". الأسباب المحتملة: كلمة السر غير محفوظة، الشبكة خارج النطاق، أو طريقة التشفير تغيّرت. تأكدي من الاتصال يدوياً مرة واحدة لحفظ بيانات الاعتماد.`;
+  }
+  // Wi-Fi: network not found
+  if (/could not find network/i.test(rawError)) {
+    return `❌ الشبكة "${hint}" غير متوفرة في النطاق الحالي`;
+  }
+  // Wi-Fi: airport disabled
+  if (/wifi.*disabled|airport.*off/i.test(rawError)) {
+    return `❌ الـ Wi-Fi مُعطّل على الجهاز. يجب تشغيله أولاً.`;
+  }
+  return `Operation failed: ${rawError.slice(0, 150)}`;
 }
 
 async function runComputerUse(userPrompt) {
