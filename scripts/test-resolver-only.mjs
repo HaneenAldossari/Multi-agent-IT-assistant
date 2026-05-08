@@ -79,6 +79,34 @@ process.exit(1);
 async function runScripted(toolName, a1, a2) {
   const safe = (s) => s.replace(/"/g, '');
   switch (toolName) {
+    case 'brightnessUp': {
+      // F2 = key code 144 on macOS (brightness up). Press multiple times.
+      const presses = parseInt(a1, 10) || 8;
+      for (let i = 0; i < presses; i++) {
+        execSync(`osascript -e 'tell application "System Events" to key code 144'`);
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return { ok: true, message: `تمت زيادة سطوع الشاشة (${presses} مستويات)` };
+    }
+    case 'brightnessDown': {
+      const presses = parseInt(a1, 10) || 8;
+      for (let i = 0; i < presses; i++) {
+        execSync(`osascript -e 'tell application "System Events" to key code 145'`);
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return { ok: true, message: `تمت خفض سطوع الشاشة (${presses} مستويات)` };
+    }
+    case 'volumeUp': {
+      const presses = parseInt(a1, 10) || 5;
+      for (let i = 0; i < presses; i++) {
+        execSync(`osascript -e 'tell application "System Events" to key code 72'`);
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return { ok: true, message: `تمت زيادة الصوت (${presses} مستويات)` };
+    }
+    case 'mute':
+      execSync(`osascript -e 'tell application "System Events" to key code 74'`);
+      return { ok: true, message: 'تم كتم الصوت' };
     case 'openApp':
       return safeExec(`open -a "${safe(a1)}"`, `تم فتح ${a1}`, a1);
     case 'quitApp':
