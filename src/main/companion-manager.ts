@@ -10,6 +10,8 @@ import * as settingsStore from './services/settings-store';
 import * as keyStore from './services/key-store';
 import * as chatHistory from './services/chat-history-store';
 import * as analytics from './services/analytics';
+import { handleUserRequest } from './agents/orchestrator';
+import type { AgentMessage } from './agents/types';
 import type {
   VoiceState,
   FlickySettings,
@@ -147,6 +149,85 @@ async function runOpenAIVision(
   }
 }
 
+// Anthropic Claude vision call — same contract as runOpenAIVision but uses the
+// Anthropic Messages API. Forces JSON output by prefilling the assistant turn
+// with `{` (Anthropic doesn't have a native json_object response_format).
+async function runAnthropicVision(
+  apiKey: string,
+  transcript: string,
+  screenshot: ScreenCapture,
+  signal: AbortSignal,
+): Promise<VisionResult | null> {
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      signal,
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 700,
+        temperature: 0.2,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: 'image/jpeg',
+                  data: screenshot.dataBase64,
+                },
+              },
+              { type: 'text', text: transcript },
+            ],
+          },
+          { role: 'assistant', content: '{' },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error('[Multi-Agent] Anthropic vision call failed:', res.status, await res.text());
+      return null;
+    }
+
+    const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+    const text = data.content?.find((c) => c.type === 'text')?.text;
+    if (!text) {
+      console.error('[Multi-Agent] Anthropic returned no text content');
+      return null;
+    }
+
+    let jsonStr = '{' + text;
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (lastBrace !== -1) jsonStr = jsonStr.slice(0, lastBrace + 1);
+
+    const parsed = JSON.parse(jsonStr) as Partial<VisionResult>;
+    if (
+      typeof parsed.response_arabic !== 'string' ||
+      typeof parsed.cursor_x !== 'number' ||
+      typeof parsed.cursor_y !== 'number' ||
+      typeof parsed.cursor_label !== 'string'
+    ) {
+      console.error('[Multi-Agent] Anthropic returned malformed JSON:', parsed);
+      return null;
+    }
+    return parsed as VisionResult;
+  } catch (err) {
+    if (err instanceof Error && (err.name === 'AbortError' || signal.aborted)) {
+      return null;
+    }
+    console.error('[Multi-Agent] Anthropic vision call threw:', err);
+    return null;
+  }
+}
+
 export interface CompanionCallbacks {
   onVoiceStateChanged: (state: VoiceState) => void;
   onTranscriptUpdate: (result: TranscriptionResult) => void;
@@ -163,10 +244,15 @@ export interface CompanionCallbacks {
   onStreamVisibilityChanged: (v: StreamVisibility) => void;
   /**
    * Multi-Agent IT Assistant — fired at the start of every request so the agent
-   * collaboration panel restarts its (currently hard-coded) animation
-   * timeline. Will become real agent events once the orchestrator lands.
+   * collaboration panel restarts its animation. The orchestrator follows up
+   * with onAgentMessage events that drive the panel from real state.
    */
   onAgentPanelShow: () => void;
+  /**
+   * Multi-Agent IT Assistant — per-agent state update. Streams from the
+   * orchestrator each time an agent transitions (thinking → active → done).
+   */
+  onAgentMessage: (msg: AgentMessage) => void;
 }
 
 export class CompanionManager {
@@ -181,6 +267,14 @@ export class CompanionManager {
   private voiceState: VoiceState = 'idle';
   private lastScreenshots: ScreenCapture[] = [];
   private isRecording = false;
+  /**
+   * True from the moment we begin transcribing a captured turn until the
+   * agent pipeline (transcribe → screenshot → orchestrator → final reply)
+   * fully resolves. While true, any new PTT press is ignored — the user
+   * cannot start another turn until the previous one finishes. Without
+   * this lock, rapid PTT presses race and corrupt the agent panel state.
+   */
+  private isProcessingTurn = false;
   private reRegisterShortcut: ((accel: string) => boolean) | null = null;
   /**
    * Monotonic turn counter. A new PTT press bumps this; any still-running
@@ -422,11 +516,22 @@ export class CompanionManager {
   // ── Push-to-Talk Pipeline ────────────────────────────────────────────
 
   async handlePushToTalk(): Promise<void> {
+    // While a turn is being processed (transcription → agents → response),
+    // ignore new PTT presses entirely. This prevents the user from kicking
+    // off a second turn that races with the first one mid-Computer-Use.
+    if (this.isProcessingTurn) {
+      console.log('[Multi-Agent] PTT ignored — previous turn still processing');
+      return;
+    }
     if (this.isRecording) await this.stopRecordingAndProcess();
     else await this.startRecording();
   }
 
   async startPushToTalk(): Promise<void> {
+    if (this.isProcessingTurn) {
+      console.log('[Multi-Agent] startPushToTalk ignored — turn in progress');
+      return;
+    }
     if (this.isRecording || this.pendingStart) return;
     const p = this.startRecording();
     this.pendingStart = p;
@@ -480,13 +585,16 @@ export class CompanionManager {
 
   private async stopRecordingAndProcess(): Promise<void> {
     this.isRecording = false;
+    this.isProcessingTurn = true;       // lock — no new PTT until done
     this.callbacks.onStopAudioCapture();
     analytics.trackPushToTalkReleased();
 
     if (!this.transcriptionProvider) {
+      this.isProcessingTurn = false;
       this.setVoiceState('idle');
       return;
     }
+    try {
 
     const result = await this.transcriptionProvider.stop();
     this.transcriptionProvider = null;
@@ -615,100 +723,83 @@ export class CompanionManager {
     // Honors abort + turnId so a new PTT press cleanly cancels mid-stub.
     void mindOptions;  // unused in stub; real orchestrator (Phase 2) consumes it
 
-    // Kick off the visual agent-collaboration panel (demo theater). The
-    // panel runs its own ~12s animation independently — re-firing the
-    // callback restarts it from t=0.
-    console.log(`[Multi-Agent] stub: opening agent panel, turnId=${myTurnId}`);
+    // Open the agent collaboration panel. The renderer runs a hardcoded
+    // animation only as a fallback — once real onAgentMessage events start
+    // arriving from the orchestrator, the panel switches to driving its
+    // visuals from those events.
+    console.log(`[Multi-Agent] orchestrator: opening agent panel, turnId=${myTurnId}`);
+    // The agent panel is the canonical "🛑 agent is working — don't touch"
+    // indicator. It pulses blue during Computer Use so the user knows the
+    // cursor is being controlled by the agent. Without this, users would
+    // grab the mouse mid-action and break the run.
     this.callbacks.onAgentPanelShow();
 
-    // Kick off the OpenAI vision call in parallel with the panel animation.
-    // Single gpt-4o call, returns JSON {response_arabic, cursor_x, cursor_y,
-    // cursor_label}. If the user has no OpenAI key set or the call fails,
-    // openaiPromise resolves to null and we use the hardcoded VPN fallback.
-    const openaiKey = keyStore.getApiKey('openai');
+    const anthropicKey = keyStore.getApiKey('anthropic');
     const visionScreenshot = this.lastScreenshots[0];
-    const openaiPromise: Promise<VisionResult | null> =
-      openaiKey && visionScreenshot
-        ? runOpenAIVision(openaiKey, result.text, visionScreenshot, abort.signal)
-        : Promise.resolve(null);
-    if (!openaiKey) {
-      console.log('[Multi-Agent] no OpenAI key configured — will use hardcoded fallback');
-    } else if (!visionScreenshot) {
-      console.log('[Multi-Agent] no screenshot captured — will use hardcoded fallback');
-    } else {
-      console.log('[Multi-Agent] OpenAI vision call dispatched in parallel with panel');
-    }
 
-    // Match the panel's animation duration + the small fade tail so the
-    // cursor + final message land just as the panel finishes. The panel
-    // window is auto-hidden by main at +12.5s.
-    const STUB_DELAY_MS = 12500;
-    let stubAborted = false;
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, STUB_DELAY_MS);
-      abort.signal.addEventListener('abort', () => {
-        stubAborted = true;
-        clearTimeout(timer);
-        resolve();
-      });
-    });
-
-    if (stubAborted || !isCurrent()) {
-      console.log(`[Multi-Agent] stub: aborted before delivery, stubAborted=${stubAborted}, isCurrent=${isCurrent()}`);
-    } else {
-      // Wait for the OpenAI call to settle (or fall back). It usually
-      // finishes well before the 12.5s panel timeline, so this awaits
-      // immediately. If gpt-4o is slow today, the user sees a brief
-      // post-panel pause — acceptable for a proposal demo.
-      const visionResult = await openaiPromise;
-
-      let finalMessage: string;
-      let cursorTarget: { x: number; y: number; label: string; screenIndex: number };
-
-      if (visionResult && visionScreenshot) {
-        // Real OpenAI output. Transform image-pixel coords back into the
-        // display coordinate space the cursor overlay expects.
-        const sx = visionScreenshot.displayBounds.width / visionScreenshot.imageWidth;
-        const sy = visionScreenshot.displayBounds.height / visionScreenshot.imageHeight;
-        finalMessage = visionResult.response_arabic;
-        cursorTarget = {
-          x: Math.round(visionScreenshot.displayBounds.x + visionResult.cursor_x * sx),
-          y: Math.round(visionScreenshot.displayBounds.y + visionResult.cursor_y * sy),
-          label: visionResult.cursor_label,
-          screenIndex: 0,
-        };
-        console.log(
-          `[Multi-Agent] stub: using OpenAI response, cursor ${visionResult.cursor_x},${visionResult.cursor_y}` +
-          ` (image px) → ${cursorTarget.x},${cursorTarget.y} (display)`,
-        );
-      } else {
-        // Fallback: hardcoded VPN scenario response. Triggered when the
-        // user hasn't set an OpenAI key, the call failed, or the model
-        // returned malformed JSON.
-        finalMessage =
-          'هذا خطأ مصادقة شائع. اضغط على Disconnect ثم سجّل دخول مرة ثانية ' +
-          'بكلمة المرور الحالية. الموضوع يأخذ أقل من دقيقة.';
-        const primary = screen.getPrimaryDisplay();
-        cursorTarget = {
-          x: primary.bounds.x + Math.floor(primary.bounds.width / 2),
-          y: primary.bounds.y + Math.floor(primary.bounds.height / 2),
-          label: 'اضغط هنا لإعادة المصادقة',
-          screenIndex: 0,
-        };
-        console.log('[Multi-Agent] stub: using hardcoded VPN fallback');
-      }
-
-      mindCallbacks.onChunk(finalMessage);
-      await mindCallbacks.onComplete(finalMessage);
-
+    if (!anthropicKey || !visionScreenshot) {
+      // Degraded path. Surface a clear hardcoded message rather than nothing
+      // so the demo never silently fails when keys aren't configured.
+      const finalMessage = !anthropicKey
+        ? 'مفتاح Anthropic غير مُعرّف. أضفه من تبويب Mind لتفعيل الوكلاء.'
+        : 'تعذّر التقاط الشاشة. تحقق من صلاحية تسجيل الشاشة.';
+      const primary = screen.getPrimaryDisplay();
+      const cursorTarget = {
+        x: primary.bounds.x + Math.floor(primary.bounds.width / 2),
+        y: primary.bounds.y + Math.floor(primary.bounds.height / 2),
+        label: 'تحقق من الإعدادات',
+        screenIndex: 0,
+      };
+      console.log('[Multi-Agent] orchestrator: degraded path — missing key or screenshot');
       if (isCurrent()) {
-        console.log(`[Multi-Agent] stub: firing cursor at ${cursorTarget.x},${cursorTarget.y}`);
+        mindCallbacks.onChunk(finalMessage);
+        await mindCallbacks.onComplete(finalMessage);
         this.callbacks.onElementDetected(cursorTarget);
+      }
+    } else {
+      // Real path. Call the 4-agent orchestrator with the same abort/turnId
+      // semantics Flicky uses for its single-call path. Each agent emits
+      // onAgentMessage events that drive the visual panel.
+      console.log('[Multi-Agent] orchestrator: dispatching 4-agent pipeline');
+      const output = await handleUserRequest({
+        voiceTranscript: result.text,
+        screenshot: visionScreenshot,
+        anthropicKey,
+        signal: abort.signal,
+        onAgentMessage: (msg) => {
+          if (!isCurrent()) return;
+          this.callbacks.onAgentMessage(msg);
+        },
+      });
+
+      if (!isCurrent()) {
+        console.log('[Multi-Agent] orchestrator: turn preempted, dropping output');
+      } else if (!output) {
+        // Orchestrator returned null — likely Resolver failed mid-flight.
+        // Surface a generic Arabic fallback so the user gets *something*.
+        const fallbackMessage = 'تعذّر إكمال التحليل. حاولي مرة ثانية.';
+        mindCallbacks.onChunk(fallbackMessage);
+        await mindCallbacks.onComplete(fallbackMessage);
+        console.log('[Multi-Agent] orchestrator: returned null, emitted fallback message');
+      } else {
+        mindCallbacks.onChunk(output.finalUserMessage);
+        await mindCallbacks.onComplete(output.finalUserMessage);
+        if (output.cursorTarget && isCurrent()) {
+          console.log(
+            `[Multi-Agent] orchestrator: firing cursor at ${output.cursorTarget.x},${output.cursorTarget.y}`,
+          );
+          this.callbacks.onElementDetected(output.cursorTarget);
+        }
       }
     }
     // ── end Multi-Agent IT Assistant integration boundary ─────────────────────────
 
     if (this.currentAbort === abort) this.currentAbort = null;
+    } finally {
+      // Always release the PTT lock — even on errors — so the user isn't
+      // stuck unable to record again.
+      this.isProcessingTurn = false;
+    }
   }
 
   handleAudioChunk(buffer: Buffer): void {

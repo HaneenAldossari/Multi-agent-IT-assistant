@@ -124,10 +124,10 @@ app.whenReady().then(() => {
       sendToStream(IPC.AI_RESPONSE_COMPLETE, text);
     },
     onElementDetected: (el) => {
-      sendToOverlays(IPC.ELEMENT_DETECTED, el);
-      // Drive the dedicated target-cursor window in parallel — small
-      // floating windows composite correctly on macOS Sonoma+ where the
-      // fullscreen overlay does not.
+      // The Multi-Agent target-cursor window is the canonical click-target
+      // indicator. The legacy fullscreen overlay path is intentionally NOT
+      // notified here — sending to both produced two visible cursors at the
+      // same coordinates.
       updateTargetCursor(el);
     },
     onSettingsChanged: (s) => sendToPanel(IPC.SETTINGS_CHANGED, s),
@@ -139,6 +139,11 @@ app.whenReady().then(() => {
     onCursorVisibilityChanged: (enabled) => applyOverlayVisibility(enabled),
     onStreamVisibilityChanged: (v) => applyStreamVisibility(v),
     onAgentPanelShow: () => showAgentPanel(),
+    onAgentMessage: (msg) => {
+      if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+        agentPanelWindow.webContents.send(IPC.AGENT_MESSAGE, msg);
+      }
+    },
   });
 
   // Create tray
@@ -514,12 +519,14 @@ function updateTargetCursor(el: { x: number; y: number; label: string } | null):
       targetCursorHideTimer = null;
     }
     const [w, h] = targetCursorWindow.getSize();
-    // Triangle is in the leading edge of the window content. Anchor the
-    // window so the triangle's visual tip lands on (el.x, el.y) — the
-    // triangle is ~56px and sits at the start of the row with ~14px
-    // margin-top, so we offset slightly up-left from the target.
-    const x = Math.round(el.x - 14);
-    const y = Math.round(el.y - 14);
+    // Anchor the window so the triangle's visual tip lands on (el.x, el.y).
+    // The polygon's pointing tip is at SVG (4,4) inside a 56×56 triangle
+    // displayed at scale 56/48. With margin-top: 6px on the triangle, the
+    // tip's pixel offset inside the window is approximately (5, 11). We
+    // require the cursor capsule to use LTR layout (see .tc-root in
+    // target-cursor.css) so the triangle is always the leftmost child.
+    const x = Math.round(el.x - 5);
+    const y = Math.round(el.y - 11);
     // Clamp to the display we're on so the bubble doesn't fall offscreen.
     const display = screen.getDisplayNearestPoint({ x: el.x, y: el.y });
     const maxX = display.bounds.x + display.bounds.width - w - 8;

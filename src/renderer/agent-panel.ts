@@ -100,10 +100,73 @@ function startTimeline(): void {
 // Trigger comes from main via the preload bridge (window.flicky.onAgentPanelShow).
 // The Window.flicky global is declared in src/renderer/types.d.ts; we only
 // guard against the standalone-browser-preview case (no preload attached).
-const flickyApi = (window as unknown as { flicky?: typeof window.flicky }).flicky;
+const flickyApi = (window as unknown as {
+  flicky?: typeof window.flicky & {
+    onAgentMessage?: (
+      cb: (msg: { agent: string; status: string; text: string; timestamp: number }) => void,
+    ) => () => void;
+  };
+}).flicky;
+
+// Real agent events from the orchestrator. When at least one event has been
+// received for the current request, we suppress the hardcoded timeline and
+// drive the panel purely from real agent state. The timeline only runs as a
+// fallback for the proposal-phase code path or when the orchestrator fails.
+let realEventReceivedThisTurn = false;
+
+const titleEl = document.querySelector<HTMLSpanElement>('.ap-title');
+
+function setComputerUseActive(active: boolean): void {
+  root.classList.toggle('is-cu-active', active);
+  if (titleEl) {
+    titleEl.textContent = active
+      ? '🛑 الوكيل يعمل — لا تحرّك المؤشر'
+      : 'الوكلاء يتعاونون...';
+  }
+}
+
+function applyAgentEvent(msg: { agent: string; status: string; text: string }): void {
+  const agent = msg.agent as AgentId;
+  if (!rows[agent]) return;
+  realEventReceivedThisTurn = true;
+
+  // Detect Computer Use phase: when Resolver is thinking with messages
+  // about screen control, surface a prominent "agent in control" indicator.
+  if (agent === 'resolver') {
+    if (msg.status === 'thinking') {
+      setComputerUseActive(true);
+    } else if (msg.status === 'active' || msg.status === 'done') {
+      setComputerUseActive(false);
+    }
+  }
+
+  if (msg.status === 'thinking') {
+    startThinking(agent);
+    setStatus(agent, msg.text);
+  } else if (msg.status === 'active' || msg.status === 'done') {
+    setMessage(agent, msg.text);
+  }
+}
+
 if (flickyApi?.onAgentPanelShow) {
-  flickyApi.onAgentPanelShow(() => startTimeline());
+  flickyApi.onAgentPanelShow(() => {
+    realEventReceivedThisTurn = false;
+    clearTimers();
+    resetAll();
+    void root.offsetWidth;
+    root.classList.add('is-visible');
+    // Defer the hardcoded timeline by 600ms — if real agent events arrive in
+    // that window, we suppress the timeline entirely.
+    const fallbackTimer = setTimeout(() => {
+      if (!realEventReceivedThisTurn) startTimeline();
+    }, 600);
+    activeTimers.push(fallbackTimer);
+  });
 } else {
   // Standalone preview path — useful when opening agent-panel.html directly.
   startTimeline();
+}
+
+if (flickyApi?.onAgentMessage) {
+  flickyApi.onAgentMessage((msg) => applyAgentEvent(msg));
 }

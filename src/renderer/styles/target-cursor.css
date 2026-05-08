@@ -21,6 +21,14 @@ html, body {
   display: flex;
   align-items: flex-start;
   gap: 14px;
+  /* Force LTR layout for the cursor capsule so the triangle is always the
+   * first (leftmost) child, regardless of html[dir]. Main process positions
+   * the window assuming the triangle's tip is at the window's top-left. With
+   * inherited RTL the triangle ends up on the right side of the window and
+   * the cursor lands ~200px right of the target. The Arabic text inside
+   * .tc-bubble still renders correctly — Arabic glyphs are inherently RTL
+   * via the Unicode bidirectional algorithm regardless of container dir. */
+  direction: ltr;
 }
 
 /* ── Cursor triangle ────────────────────────────────────────────────── */

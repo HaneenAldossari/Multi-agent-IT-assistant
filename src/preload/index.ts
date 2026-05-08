@@ -148,6 +148,13 @@ const api = {
     return () => ipcRenderer.removeListener(IPC.SHOW_AGENT_PANEL, handler);
   },
 
+  // Multi-Agent IT Assistant — per-agent state updates from the orchestrator.
+  onAgentMessage: (cb: (msg: { agent: string; status: string; text: string; timestamp: number }) => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, msg: { agent: string; status: string; text: string; timestamp: number }) => cb(msg);
+    ipcRenderer.on(IPC.AGENT_MESSAGE, handler);
+    return () => ipcRenderer.removeListener(IPC.AGENT_MESSAGE, handler);
+  },
+
   // Multi-Agent IT Assistant — Target cursor (small floating window).
   onShowTargetCursor: (cb: (label: string) => void) => {
     const handler = (_e: Electron.IpcRendererEvent, label: string) => cb(label);

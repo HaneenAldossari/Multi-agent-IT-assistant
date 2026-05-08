@@ -249,6 +249,12 @@ export const IPC = {
   // hard restart of the animation timeline.
   SHOW_AGENT_PANEL: 'show-agent-panel',
 
+  // Multi-Agent IT Assistant — per-agent state update broadcast. Fired by the
+  // orchestrator each time an agent transitions thinking → active → done.
+  // The renderer's agent-panel consumes this to drive its visuals from real
+  // events instead of a hardcoded timeline.
+  AGENT_MESSAGE: 'agent-message',
+
   // Multi-Agent IT Assistant — Wispr-style recording pill (bottom-center of primary
   // display, fades in/out with mic state, animates audio levels).
   SHOW_REC_PILL: 'show-rec-pill',

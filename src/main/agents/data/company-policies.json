@@ -1,0 +1,59 @@
+[
+  {
+    "id": "NCA-ECC-2-T2-3-1",
+    "title_arabic": "تحويل شبكات Wi-Fi",
+    "rule_arabic": "يُسمح بالتحويل بين شبكات الشركة المعتمدة (Office-WiFi, Office-Guest) دون موافقة إضافية. التحويل من شبكة جوال إلى شبكة الشركة آمن ومُفضَّل.",
+    "applies_to_actions": ["switch_wifi", "network_change_to_corporate"],
+    "verdict_default": "approve",
+    "blocks_action": false
+  },
+  {
+    "id": "NCA-IDM-1-T1-2",
+    "title_arabic": "إعادة تعيين كلمات المرور",
+    "rule_arabic": "إعادة تعيين كلمات المرور تتطلب تحقق هوية بشري ولا يجوز للوكيل تنفيذها مباشرة. يجب التصعيد لفريق الهوية والوصول.",
+    "applies_to_actions": ["reset_password", "change_password", "unlock_account"],
+    "verdict_default": "block",
+    "blocks_action": true
+  },
+  {
+    "id": "NCA-AAC-3-T4-1",
+    "title_arabic": "تثبيت البرامج الجديدة من مصادر خارجية",
+    "rule_arabic": "تثبيت أي برنامج من مصدر خارجي (مواقع الإنترنت، روابط مرسلة، ملفات تنفيذية) ممنوع منعاً باتاً. الوكيل لا يقوم بهذا الإجراء، ويقترح بديلاً معتمداً.",
+    "applies_to_actions": ["install_software", "install_app", "download_executable", "install_from_url"],
+    "verdict_default": "block",
+    "blocks_action": true,
+    "suggested_alternative_arabic": "استخدم بوابة البرامج المعتمدة في الشركة — تحوي بدائل مرخّصة لكل البرامج الشائعة (مثل: 7-Zip بدلاً من WinRAR، VS Code بدلاً من محررات غير معتمدة)."
+  },
+  {
+    "id": "NCA-NSEC-4-T2-1",
+    "title_arabic": "تعديل جدار الحماية وإعدادات الأمان",
+    "rule_arabic": "يُمنع تماماً تعديل إعدادات جدار الحماية، VPN profiles، أو شهادات الأمان من قبل الوكيل. هذه إجراءات حساسة تتطلب فريق الأمن السيبراني.",
+    "applies_to_actions": ["modify_firewall", "edit_vpn_profile", "install_certificate", "change_security_settings"],
+    "verdict_default": "block",
+    "blocks_action": true
+  },
+  {
+    "id": "NCA-DSP-2-T3-5",
+    "title_arabic": "إعادة تشغيل التطبيقات",
+    "rule_arabic": "يُسمح بإغلاق وإعادة تشغيل تطبيقات الإنتاجية المعتمدة (Outlook, Slack, Teams, Excel) لحل مشاكل الأداء.",
+    "applies_to_actions": ["restart_app", "force_quit", "reopen_app"],
+    "verdict_default": "approve",
+    "blocks_action": false
+  },
+  {
+    "id": "NCA-DSP-3-T1-1",
+    "title_arabic": "الوصول إلى الملفات الشخصية والبريد",
+    "rule_arabic": "يُمنع على الوكيل فتح الملفات الشخصية للموظف، رسائل البريد، أو محتوى المستندات الخاصة. الإجراءات تقتصر على عناصر الواجهة فقط.",
+    "applies_to_actions": ["open_personal_file", "read_email_content", "browse_documents"],
+    "verdict_default": "block",
+    "blocks_action": true
+  },
+  {
+    "id": "NCA-OPN-1-T1-3",
+    "title_arabic": "فتح التطبيقات عبر Spotlight",
+    "rule_arabic": "يُسمح بفتح أي تطبيق مثبَّت مسبقاً على جهاز الموظف عبر Spotlight أو Launchpad دون موافقة إضافية.",
+    "applies_to_actions": ["open_app", "launch_app", "spotlight_search"],
+    "verdict_default": "approve",
+    "blocks_action": false
+  }
+]

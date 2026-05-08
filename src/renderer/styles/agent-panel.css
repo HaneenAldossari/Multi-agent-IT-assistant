@@ -46,6 +46,37 @@ html, body {
   transform: translateY(0) scale(1);
 }
 
+/* When Computer Use is actively driving the cursor, the panel is the
+ * canonical "agent in control" indicator — there is no separate floating
+ * pointer/bubble during this phase. The panel pulses blue so the user
+ * knows the agent has the wheel. */
+.ap-root.is-cu-active {
+  border-color: rgba(77, 141, 255, 0.55);
+  animation: ap-cu-pulse 2s ease-in-out infinite;
+}
+.ap-root.is-cu-active .ap-title {
+  color: #93C5FD;
+  letter-spacing: 0.2px;
+}
+@keyframes ap-cu-pulse {
+  0%, 100% {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 24px 60px rgba(0, 0, 0, 0.55),
+      0 4px 14px rgba(0, 0, 0, 0.30),
+      0 0 0 1px rgba(77, 141, 255, 0.45),
+      0 0 24px rgba(77, 141, 255, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 24px 60px rgba(0, 0, 0, 0.55),
+      0 4px 14px rgba(0, 0, 0, 0.30),
+      0 0 0 1.5px rgba(77, 141, 255, 0.65),
+      0 0 40px rgba(77, 141, 255, 0.55);
+  }
+}
+
 /* ── Header ─────────────────────────────────────────────────────────── */
 .ap-header {
   display: flex;
