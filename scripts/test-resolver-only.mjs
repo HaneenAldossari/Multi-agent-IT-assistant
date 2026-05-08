@@ -140,12 +140,34 @@ async function runComputerUse(userPrompt) {
       ],
     },
   ];
-  const SYS = `You are an IT support agent on macOS. Use Spotlight to open apps:
-key("cmd+space") → type("AppName") → key("Return") → wait(2) → screenshot
+  const SYS = `You are an IT support agent on macOS. Drive the cursor and keyboard to complete the task.
 
-Take MINIMUM steps. Final response is one short Arabic sentence.`;
+═══ APP TASKS ═══
+To open an app, use Spotlight:
+  key("cmd+space") → type("AppName") → key("Return") → wait(2) → screenshot
 
-  for (let i = 0; i < 8; i++) {
+═══ Wi-Fi SWITCHING ═══
+On macOS Sonoma+, the Wi-Fi control is in CONTROL CENTER, not as a standalone menu bar icon.
+
+To switch Wi-Fi:
+  1. screenshot — find the Control Center icon in the menu bar
+     (it's the icon with two stacked toggle switches, top-right of menu bar)
+  2. left_click on that Control Center icon
+  3. wait(1) → screenshot
+  4. left_click on the Wi-Fi tile (top-left of Control Center, shows the network name)
+  5. wait(1) → screenshot — see the list of available networks
+  6. left_click on the target network name
+  7. wait(3) → screenshot — verify connection
+  8. Final message: "تم التحويل إلى <network>."
+
+If Control Center isn't found, try clicking the Wi-Fi icon directly in the menu bar (older macOS layout, top-right).
+
+═══ GENERAL RULES ═══
+- Take screenshots frequently to verify state
+- Don't click random coordinates — always look at a screenshot first
+- Final response: ONE short Arabic sentence (no tool calls)`;
+
+  for (let i = 0; i < 12; i++) {
     process.stdout.write(`  [iter ${i + 1}] `);
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -216,10 +238,10 @@ async function executeAction(input) {
         const dx = Math.round(coordinate[0] * scale);
         const dy = Math.round(coordinate[1] * scale);
         try {
-          execSync(`osascript -e 'tell application "System Events" to click at {${dx}, ${dy}}'`);
+          smoothClickViaPython(dx, dy);
         } catch (e) { return { error: e.message }; }
       }
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 400));
       return { image: takeScreenshot() };
     case 'type':
       if (text) {
@@ -272,4 +294,35 @@ function takeScreenshot() {
   if (existsSync(path)) unlinkSync(path);
   if (existsSync(small)) unlinkSync(small);
   return b;
+}
+
+/**
+ * Smoothly animate the cursor from its current position to (x, y) over
+ * ~400ms, then click. Uses Quartz CGEventPost via macOS-bundled Python 3.
+ * Without this, osascript "click at" teleports the cursor instantly so
+ * the user (and the demo audience) never sees it move. With this, the
+ * cursor visibly slides across the screen — the agentic moment.
+ */
+function smoothClickViaPython(x, y) {
+  const py = [
+    'import Quartz, time',
+    'm = Quartz.CGEventGetLocation(Quartz.CGEventCreate(None))',
+    `sx, sy = m.x, m.y`,
+    `ex, ey = ${x}, ${y}`,
+    `steps = 28`,
+    `for i in range(steps + 1):`,
+    `    t = i / steps`,
+    `    e = t * t * (3 - 2 * t)`,
+    `    cx = sx + (ex - sx) * e`,
+    `    cy = sy + (ey - sy) * e`,
+    `    ev = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventMouseMoved, (cx, cy), Quartz.kCGMouseButtonLeft)`,
+    `    Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)`,
+    `    time.sleep(0.013)`,
+    `time.sleep(0.08)`,
+    `down = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseDown, (ex, ey), Quartz.kCGMouseButtonLeft)`,
+    `up = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, (ex, ey), Quartz.kCGMouseButtonLeft)`,
+    `Quartz.CGEventPost(Quartz.kCGHIDEventTap, down)`,
+    `Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)`,
+  ].join('\n');
+  spawnSync('/usr/bin/python3', ['-c', py], { stdio: 'pipe' });
 }
