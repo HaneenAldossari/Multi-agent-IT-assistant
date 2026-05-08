@@ -1,5 +1,35 @@
 [
   {
+    "id": "INC-2024-1363",
+    "date": "2024-11-11",
+    "user_role": "موظف امتثال",
+    "symptom_arabic": "افحص جهازي وأصلح مشاكل الامتثال للأمن السيبراني",
+    "diagnosis": "تدقيق NCA-ECC ومعالجة تلقائية للمشاكل الآمنة",
+    "resolution_method": "scripted",
+    "scripted_tool": "ncaAuditAndFix",
+    "scripted_args": {},
+    "resolution_steps": "تدقيق + إصلاح تلقائي + إعادة تدقيق + تقرير قبل/بعد",
+    "outcome": "resolved",
+    "resolution_time_seconds": 7,
+    "category": "compliance_audit",
+    "playbook": "nca_audit_and_fix"
+  },
+  {
+    "id": "INC-2024-1362",
+    "date": "2024-11-11",
+    "user_role": "موظف",
+    "symptom_arabic": "اجعل جهازي متوافق مع متطلبات NCA",
+    "diagnosis": "طلب رفع مستوى الامتثال",
+    "resolution_method": "scripted",
+    "scripted_tool": "ncaAuditAndFix",
+    "scripted_args": {},
+    "resolution_steps": "إصلاح تلقائي للعناصر الآمنة، فتح الإعدادات للعناصر الإدارية",
+    "outcome": "resolved",
+    "resolution_time_seconds": 6,
+    "category": "compliance_audit",
+    "playbook": "nca_audit_and_fix"
+  },
+  {
     "id": "INC-2024-1360",
     "date": "2024-11-10",
     "user_role": "موظف امتثال",

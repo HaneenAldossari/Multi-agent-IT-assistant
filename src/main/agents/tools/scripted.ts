@@ -8,6 +8,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { runNcaAudit } from './nca-audit';
+import { runNcaAuditAndFix } from './nca-fix';
 const execAsync = promisify(exec);
 
 export interface ScriptedResult {
@@ -105,6 +106,24 @@ export async function ncaAudit(): Promise<ScriptedResult> {
   }
 }
 
+/** Run NCA audit and auto-remediate failures where safe. */
+export async function ncaAuditAndFix(): Promise<ScriptedResult> {
+  try {
+    const result = await runNcaAuditAndFix();
+    return {
+      ok: result.afterReport.passCount > result.beforeReport.passCount,
+      message: result.summaryArabic,
+      script: 'NCA-ECC audit + auto-remediation',
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: 'تعذّر إجراء التدقيق والمعالجة',
+      script: `nca-fix → ${err instanceof Error ? err.message : err}`,
+    };
+  }
+}
+
 /** Dispatch by tool name. Returns null if unknown tool. */
 export async function dispatchScripted(
   tool: string,
@@ -127,6 +146,10 @@ export async function dispatchScripted(
     case 'nca_audit':
     case 'securityAudit':
       return ncaAudit();
+    case 'ncaAuditAndFix':
+    case 'nca_audit_fix':
+    case 'fixCompliance':
+      return ncaAuditAndFix();
     default:
       return null;
   }

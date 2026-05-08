@@ -107,6 +107,81 @@ async function runScripted(toolName, a1, a2) {
     case 'mute':
       execSync(`osascript -e 'tell application "System Events" to key code 74'`);
       return { ok: true, message: 'تم كتم الصوت' };
+    case 'ncaAuditAndFix':
+    case 'fixCompliance': {
+      console.log('🛡️  Running NCA-ECC audit + auto-remediation...\n');
+
+      // Phase 1: audit (same checks as ncaAudit case)
+      const before = await Promise.all([
+        runCheck('FileVault encryption', 'NCA-ECC-2-T4-1', `fdesetup status`, /FileVault is On/i),
+        runCheck('Screen lock password', 'NCA-ECC-2-T2-3', `defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0`, /^1$/m),
+        runCheck('Firewall', 'NCA-ECC-2-T5-1', `defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0`, /^[12]$/m),
+        runCheck('System updates', 'NCA-ECC-2-T6-2', `softwareupdate --list 2>&1`, /No new software available/i),
+        runCheck('Login password set', 'NCA-ECC-2-T2-1', `dscl . -read /Users/$(whoami) Password 2>/dev/null || echo unknown`, /Password:.+\S/),
+      ]);
+      const beforePass = before.filter((c) => c.ok).length;
+
+      console.log('قبل المعالجة:');
+      for (const c of before) console.log(`  ${c.ok ? '✅' : '❌'} ${c.title} (${c.ref})`);
+      console.log(`\nالنتيجة قبل: ${beforePass} / ${before.length}\n`);
+
+      // Phase 2: apply remediations for failed checks
+      console.log('الإجراءات التي اتخذها الوكيل:');
+      const fixActions = [];
+      for (const c of before) {
+        if (c.ok) continue;
+        if (c.title.includes('Screen lock')) {
+          try {
+            await execP('defaults write com.apple.screensaver askForPassword -bool true');
+            await execP('defaults write com.apple.screensaver askForPasswordDelay -int 0');
+            fixActions.push({ title: c.title, action: 'fixed', detail: 'تم تفعيل قفل الشاشة الفوري' });
+          } catch (e) { fixActions.push({ title: c.title, action: 'skipped', detail: 'فشل التفعيل' }); }
+        } else if (c.title.includes('Firewall')) {
+          try {
+            await execP('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
+            fixActions.push({ title: c.title, action: 'opened', detail: 'فُتحت إعدادات جدار الحماية للتفعيل اليدوي' });
+          } catch (e) { fixActions.push({ title: c.title, action: 'skipped', detail: 'تعذّر فتح الإعدادات' }); }
+        } else if (c.title.includes('updates')) {
+          try {
+            await execP('open "x-apple.systempreferences:com.apple.preferences.softwareupdate"');
+            fixActions.push({ title: c.title, action: 'opened', detail: 'فُتحت Software Update للمراجعة' });
+          } catch (e) { fixActions.push({ title: c.title, action: 'skipped', detail: 'تعذّر فتح Software Update' }); }
+        } else if (c.title.includes('FileVault')) {
+          try {
+            await execP('open "x-apple.systempreferences:com.apple.preference.security?FDE"');
+            fixActions.push({ title: c.title, action: 'opened', detail: '⚠️ FileVault لن يُفعّل تلقائياً (خطر فقد البيانات)؛ فُتحت الإعدادات' });
+          } catch (e) { fixActions.push({ title: c.title, action: 'skipped', detail: 'تعذّر فتح إعدادات FileVault' }); }
+        }
+      }
+
+      for (const fa of fixActions) {
+        const icon = fa.action === 'fixed' ? '✅' : fa.action === 'opened' ? '⚙️' : '⚠️';
+        console.log(`  ${icon} ${fa.title}`);
+        console.log(`     ${fa.detail}`);
+      }
+
+      // Phase 3: re-audit
+      await new Promise((r) => setTimeout(r, 800));
+      const after = await Promise.all([
+        runCheck('FileVault encryption', 'NCA-ECC-2-T4-1', `fdesetup status`, /FileVault is On/i),
+        runCheck('Screen lock password', 'NCA-ECC-2-T2-3', `defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0`, /^1$/m),
+        runCheck('Firewall', 'NCA-ECC-2-T5-1', `defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0`, /^[12]$/m),
+        runCheck('System updates', 'NCA-ECC-2-T6-2', `softwareupdate --list 2>&1`, /No new software available/i),
+        runCheck('Login password set', 'NCA-ECC-2-T2-1', `dscl . -read /Users/$(whoami) Password 2>/dev/null || echo unknown`, /Password:.+\S/),
+      ]);
+      const afterPass = after.filter((c) => c.ok).length;
+
+      console.log(`\nبعد المعالجة:`);
+      for (const c of after) console.log(`  ${c.ok ? '✅' : '❌'} ${c.title}`);
+      console.log(`\nالنتيجة بعد: ${afterPass} / ${after.length}`);
+      const delta = afterPass - beforePass;
+      const summary = delta > 0
+        ? `\n📈 تحسّن: ${beforePass} → ${afterPass} (+${delta})`
+        : `\nبقيت بعض العناصر تتطلب موافقة إدارية`;
+      console.log(summary);
+
+      return { ok: afterPass > beforePass, message: `${afterPass}/${after.length}` };
+    }
     case 'ncaAudit':
     case 'securityAudit': {
       // Inline NCA audit (matches src/main/agents/tools/nca-audit.ts behaviour)
