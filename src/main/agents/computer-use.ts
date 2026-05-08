@@ -239,13 +239,20 @@ export async function runComputerUseLoop(input: ComputerUseInput): Promise<Compu
       const errText = res ? await res.text() : 'no response';
       const status = res?.status ?? 0;
       console.error('[ComputerUse] API error:', status, errText);
-      const isRateLimit = status === 429;
+      let userFacing: string;
+      if (status === 429) {
+        userFacing = 'تجاوزنا حد الاستخدام. حاولي بعد دقيقة.';
+      } else if (/credit balance is too low/i.test(errText)) {
+        userFacing = '⚠️ رصيد Anthropic منتهٍ. أضيفي رصيداً من console.anthropic.com → Billing.';
+      } else if (status === 401) {
+        userFacing = 'مفتاح Anthropic غير صالح. تحقّقي من تبويب Mind.';
+      } else {
+        userFacing = 'تعذّر الاتصال بنموذج Claude.';
+      }
       return {
         success: false,
         iterations: i,
-        finalMessage: isRateLimit
-          ? 'تجاوزنا حد الاستخدام. حاولي بعد دقيقة.'
-          : 'تعذّر الاتصال بنموذج Claude.',
+        finalMessage: userFacing,
         reason: `API ${status}: ${errText.slice(0, 200)}`,
       };
     }
