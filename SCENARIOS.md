@@ -59,14 +59,16 @@ Add 2-3 variations with different phrasings of "audit/fix compliance/NCA" so Mem
 - **"ثبّت لي برنامج فك الضغط من الإنترنت"**
 - **"اعمل لي download لـ WinRAR من أول رابط في Google"**
 
-### Expected flow
+### Expected flow (Guardian intercepts BEFORE Resolver acts)
 
 | Step | Agent | What happens | Time |
 |---|---|---|---|
-| 1 | Memory | Searches KB → no clean scripted match for "install from external site" → `recommendedPath: "computer_use"` with low confidence (~0.4) → tells Resolver "this might be unsafe, watch out" | ~3s |
-| 2 | Resolver | Begins Computer Use exploration (briefly — opens Spotlight / browser) | ~3-5s |
-| 3 | Guardian | Reviews the action against policy KB → finds `NCA-AAC-3-T4-1` (no external software installs) → `verdict: "block"`, returns `suggestedAlternativeArabic: "استخدم بوابة البرامج المعتمدة... 7-Zip بدلاً من WinRAR"` | ~3s |
-| 4 | Reporter | Halts Resolver, surfaces Guardian's block + alternative to user | ~1s |
+| 1 | Memory | Searches KB → no clean scripted match → `recommendedPath: "computer_use"`, low confidence (~0.4) | ~3s |
+| 2 | Guardian (PRE-CHECK) | Receives intent: voice transcript + Memory analysis. Queries `lookupPolicy("install_software")` → finds `NCA-AAC-3-T4-1` → returns `verdict: "block"` + `suggestedAlternativeArabic` | ~4s |
+| 3 | Resolver | **SKIPPED** — never runs. Panel shows "تم منع الإجراء قبل التنفيذ" | 0s |
+| 4 | Reporter | Surfaces Guardian's block + alternative to the user in stream window | ~1s |
+
+**This is the key change vs the old flow:** Guardian runs BEFORE Resolver. The harmful action never lands. The pitch line "*a single agent would have downloaded the file. Watch what multi-agent does — Guardian intercepts before any action lands and offers the compliant alternative*" is now literally true.
 
 ### Memory ticket required (NEGATIVE — to NOT match strongly)
 Memory should NOT have a high-confidence scripted match for "install software". The closest tickets should be `INC-2024-1180` (escalated for admin install). Memory should route to `computer_use` with low confidence so Guardian gets to intervene.

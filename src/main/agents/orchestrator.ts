@@ -40,8 +40,8 @@ function emit(
 // TEMP: TESTING MODE — when true, the orchestrator skips Memory and
 // Guardian entirely and runs Computer Use directly with the voice
 // transcript. Used during Resolver iteration. Set to false to restore
-// the full Memory → Resolver → Guardian pipeline.
-const RESOLVER_ONLY_MODE = true;
+// the full Memory → Guardian (pre-check) → Resolver → Guardian (review) → Reporter pipeline.
+const RESOLVER_ONLY_MODE = false;
 
 export async function handleUserRequest(
   input: OrchestratorInput,
@@ -106,6 +106,54 @@ export async function handleUserRequest(
       cursorTarget: null,
     };
   }
+
+  // ── 1.5 Guardian PRE-CHECK ────────────────────────────────────────────
+  // Guardian reviews the user's INTENT (transcript + Memory's analysis)
+  // BEFORE Resolver acts. If the action would violate policy (e.g.
+  // installing a program from an external source), Guardian blocks here
+  // — Resolver never runs and the user sees the suggested alternative
+  // instead. This is what makes the multi-agent demo real: the harmful
+  // action is intercepted, not just logged after-the-fact.
+  emit(onAgentMessage, 'guardian', 'thinking', 'يراجع طلب المستخدم قبل التنفيذ...');
+  const intentDescription =
+    `طلب المستخدم: "${voiceTranscript}". تحليل الذاكرة: ${memory.summaryArabic}` +
+    (memory.recommendedPath === 'scripted' && memory.scriptedTool
+      ? ` (يقترح استخدام أداة ${memory.scriptedTool})`
+      : '');
+  const guardianPre = await runGuardianAgent(intentDescription, anthropicKey);
+  if (signal.aborted) return null;
+  console.log(
+    `[orchestrator] Guardian pre-check: verdict=${guardianPre.verdict} policy=${guardianPre.policyReference}`,
+  );
+
+  if (guardianPre.verdict === 'block') {
+    // Surface the block + alternative to the user. Resolver SKIPPED.
+    emit(onAgentMessage, 'guardian', 'active', guardianPre.rationaleArabic);
+    emit(
+      onAgentMessage,
+      'resolver',
+      'done',
+      'تم منع الإجراء قبل التنفيذ — راجعي البديل المقترح',
+    );
+    emit(onAgentMessage, 'reporter', 'thinking', 'يجمّع الرسالة النهائية مع البديل...');
+
+    const altLine = guardianPre.suggestedAlternativeArabic
+      ? `\n\n💡 البديل المقترح: ${guardianPre.suggestedAlternativeArabic}`
+      : '';
+    const finalUserMessage =
+      `🛑 تم الحجب: ${guardianPre.rationaleArabic}` +
+      `\n📜 المرجع: ${guardianPre.policyReference}` +
+      altLine;
+
+    emit(onAgentMessage, 'reporter', 'done', 'تم تسليم الرد مع البديل');
+    emit(onAgentMessage, 'memory', 'done', memory.summaryArabic);
+
+    return { finalUserMessage, cursorTarget: null };
+  }
+
+  // Guardian approved (or escalated, which we treat as approve+caveat for now).
+  // Continue to Resolver.
+  emit(onAgentMessage, 'guardian', 'active', `تمت الموافقة الأولية (${guardianPre.policyReference})`);
 
   // ── 2. Resolver — scripted fast path OR Computer Use loop ─────────────
   // If Memory recommended a known scripted tool with high confidence,
