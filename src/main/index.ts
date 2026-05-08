@@ -313,24 +313,31 @@ app.whenReady().then(() => {
   registerPttShortcut(companion.getSettings().pushToTalkShortcut);
   companion.setShortcutReRegister(registerPttShortcut);
 
-  // Escape interrupts whatever the agent is doing — transcription, Memory
+  // Abort interrupts whatever the agent is doing — transcription, Memory
   // search, Computer Use loop. Returns the system to idle so the user can
-  // press PTT and retry without restarting the app. Note that this DOES
-  // intercept Escape globally (other apps won't see it) — that's the cost
-  // of giving the user a one-keystroke abort.
-  globalShortcut.register('Escape', () => {
+  // press PTT and retry without restarting.
+  //
+  // We register MULTIPLE keybinds because macOS reserves bare Escape for
+  // system gestures and Electron's globalShortcut.register('Escape', ...)
+  // succeeds but events never fire on Sonoma+. Cmd+Shift+. is the proven
+  // reliable combination.
+  const abortHandler = () => {
+    console.log('[Multi-Agent] Abort key pressed');
     const aborted = companion.abortCurrentTurn();
     if (aborted) {
-      // Hide the agent panel and any other UI overlays
-      if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
-        agentPanelWindow.hide();
-      }
-      if (recPillWindow && !recPillWindow.isDestroyed()) {
-        recPillWindow.hide();
-      }
-      console.log('[Multi-Agent] Escape pressed — turn aborted, UI cleared');
+      if (agentPanelWindow && !agentPanelWindow.isDestroyed()) agentPanelWindow.hide();
+      if (recPillWindow && !recPillWindow.isDestroyed()) recPillWindow.hide();
+      console.log('[Multi-Agent] turn aborted, UI cleared');
+    } else {
+      console.log('[Multi-Agent] Abort pressed but nothing to abort (idle)');
     }
-  });
+  };
+  const escapeOk = globalShortcut.register('Escape', abortHandler);
+  const cmdShiftDotOk = globalShortcut.register('CommandOrControl+Shift+.', abortHandler);
+  const cmdShiftXOk = globalShortcut.register('CommandOrControl+Shift+X', abortHandler);
+  console.log(
+    `[Multi-Agent] abort shortcuts: Escape=${escapeOk}, Cmd+Shift+.=${cmdShiftDotOk}, Cmd+Shift+X=${cmdShiftXOk}`,
+  );
 
   function suspendPttShortcut(): void {
     if (currentShortcut) {
