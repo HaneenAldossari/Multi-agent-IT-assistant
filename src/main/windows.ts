@@ -38,7 +38,7 @@ export function createPanelWindow(): BrowserWindow {
     skipTaskbar: false,
     transparent: false,
     backgroundColor: '#0f0f11',
-    title: 'Flicky',
+    title: 'IT Assistant',
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,

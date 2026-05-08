@@ -542,6 +542,26 @@ export class CompanionManager {
     }
   }
 
+  /**
+   * User-requested abort. Cancels any in-flight transcription / agent
+   * pipeline / Computer Use loop. The next PTT press starts fresh.
+   * Called from the global Escape shortcut.
+   */
+  abortCurrentTurn(): boolean {
+    if (!this.isProcessingTurn && !this.isRecording) {
+      return false; // nothing to abort
+    }
+    console.log('[Multi-Agent] User pressed Escape — aborting current turn');
+    if (this.currentAbort) this.currentAbort.abort();
+    this.isRecording = false;
+    this.isProcessingTurn = false;
+    this.callbacks.onStopAudioCapture();
+    this.setVoiceState('idle');
+    // Notify the user's stream window
+    this.callbacks.onAiResponseComplete('تم إلغاء الجلسة. اضغطي على PTT لتجربة طلب آخر.');
+    return true;
+  }
+
   async stopPushToTalk(): Promise<void> {
     // If a start is still in flight, let it finish so isRecording flips
     // true before we decide whether to stop. Otherwise a quick press/release

@@ -148,7 +148,7 @@ app.whenReady().then(() => {
 
   // Create tray
   tray = new Tray(createTrayIcon());
-  tray.setToolTip('Flicky');
+  tray.setToolTip('IT Assistant');
 
   console.log('[Flicky] Tray created, registering click handler...');
 
@@ -312,6 +312,25 @@ app.whenReady().then(() => {
 
   registerPttShortcut(companion.getSettings().pushToTalkShortcut);
   companion.setShortcutReRegister(registerPttShortcut);
+
+  // Escape interrupts whatever the agent is doing — transcription, Memory
+  // search, Computer Use loop. Returns the system to idle so the user can
+  // press PTT and retry without restarting the app. Note that this DOES
+  // intercept Escape globally (other apps won't see it) — that's the cost
+  // of giving the user a one-keystroke abort.
+  globalShortcut.register('Escape', () => {
+    const aborted = companion.abortCurrentTurn();
+    if (aborted) {
+      // Hide the agent panel and any other UI overlays
+      if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
+        agentPanelWindow.hide();
+      }
+      if (recPillWindow && !recPillWindow.isDestroyed()) {
+        recPillWindow.hide();
+      }
+      console.log('[Multi-Agent] Escape pressed — turn aborted, UI cleared');
+    }
+  });
 
   function suspendPttShortcut(): void {
     if (currentShortcut) {
