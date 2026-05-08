@@ -116,7 +116,7 @@ async function runScripted(toolName, a1, a2) {
         runCheck('FileVault encryption', 'NCA-ECC-2-T4-1', `fdesetup status`, /FileVault is On/i),
         runCheck('Screen lock password', 'NCA-ECC-2-T2-3', `defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0`, /^1$/m),
         runCheck('Firewall', 'NCA-ECC-2-T5-1', `defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0`, /^[12]$/m),
-        runCheck('System updates', 'NCA-ECC-2-T6-2', `softwareupdate --list 2>&1`, /No new software available/i),
+        runCheck('System updates', 'NCA-ECC-2-T6-2', `defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null && date -j -f "%Y-%m-%d %H:%M:%S %z" "$(defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null)" "+%s" | awk -v now="$(date +%s)" '{ days=(now-$1)/86400; if (days<=30) print "OK"; else print "STALE" }'`, /OK/),
         runCheck('Login password set', 'NCA-ECC-2-T2-1', `dscl . -read /Users/$(whoami) Password 2>/dev/null || echo unknown`, /Password:.+\S/),
       ]);
       const beforePass = before.filter((c) => c.ok).length;
@@ -166,7 +166,7 @@ async function runScripted(toolName, a1, a2) {
         runCheck('FileVault encryption', 'NCA-ECC-2-T4-1', `fdesetup status`, /FileVault is On/i),
         runCheck('Screen lock password', 'NCA-ECC-2-T2-3', `defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0`, /^1$/m),
         runCheck('Firewall', 'NCA-ECC-2-T5-1', `defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0`, /^[12]$/m),
-        runCheck('System updates', 'NCA-ECC-2-T6-2', `softwareupdate --list 2>&1`, /No new software available/i),
+        runCheck('System updates', 'NCA-ECC-2-T6-2', `defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null && date -j -f "%Y-%m-%d %H:%M:%S %z" "$(defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null)" "+%s" | awk -v now="$(date +%s)" '{ days=(now-$1)/86400; if (days<=30) print "OK"; else print "STALE" }'`, /OK/),
         runCheck('Login password set', 'NCA-ECC-2-T2-1', `dscl . -read /Users/$(whoami) Password 2>/dev/null || echo unknown`, /Password:.+\S/),
       ]);
       const afterPass = after.filter((c) => c.ok).length;
@@ -190,7 +190,7 @@ async function runScripted(toolName, a1, a2) {
         runCheck('FileVault encryption', 'NCA-ECC-2-T4-1', `fdesetup status`, /FileVault is On/i),
         runCheck('Screen lock password', 'NCA-ECC-2-T2-3', `defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0`, /^1$/m),
         runCheck('Firewall', 'NCA-ECC-2-T5-1', `defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0`, /^[12]$/m),
-        runCheck('System updates', 'NCA-ECC-2-T6-2', `softwareupdate --list 2>&1`, /No new software available/i),
+        runCheck('System updates', 'NCA-ECC-2-T6-2', `defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null && date -j -f "%Y-%m-%d %H:%M:%S %z" "$(defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null)" "+%s" | awk -v now="$(date +%s)" '{ days=(now-$1)/86400; if (days<=30) print "OK"; else print "STALE" }'`, /OK/),
         runCheck('Login password set', 'NCA-ECC-2-T2-1', `dscl . -read /Users/$(whoami) Password 2>/dev/null || echo unknown`, /Password:.+\S/),
       ]);
       const passes = checks.filter((c) => c.ok).length;

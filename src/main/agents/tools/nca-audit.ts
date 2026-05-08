@@ -100,25 +100,38 @@ async function checkFirewall(): Promise<AuditCheck> {
 }
 
 async function checkUpdates(): Promise<AuditCheck> {
+  // Use last-successful-update date instead of `softwareupdate --list`.
+  // The latter contacts Apple's servers (~30s); the former is a local
+  // plist read (~50ms). For NCA compliance we only need to know that
+  // updates are being applied regularly — past 30 days = compliant.
   try {
-    const { stdout } = await execAsync('softwareupdate --list 2>&1');
-    const hasUpdates = /Software Update found|Recommended/i.test(stdout);
-    const noUpdates = /No new software available/i.test(stdout);
+    const { stdout } = await execAsync(
+      'defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate 2>/dev/null',
+    );
+    const lastUpdate = new Date(stdout.trim());
+    if (Number.isNaN(lastUpdate.getTime())) {
+      return {
+        id: 'os_updates',
+        ncaRef: 'NCA-ECC-2-T6-2',
+        titleArabic: 'تحديثات نظام التشغيل',
+        status: 'warn',
+        detailsArabic: 'تعذّر التحقق من تاريخ آخر تحديث',
+        detailsEnglish: 'Could not parse last update date',
+      };
+    }
+    const daysSince = Math.floor((Date.now() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+    const isRecent = daysSince <= 30;
     return {
       id: 'os_updates',
       ncaRef: 'NCA-ECC-2-T6-2',
       titleArabic: 'تحديثات نظام التشغيل',
-      status: noUpdates ? 'pass' : hasUpdates ? 'warn' : 'unknown',
-      detailsArabic: noUpdates
-        ? 'النظام محدّث بالكامل — لا توجد تحديثات معلّقة'
-        : hasUpdates
-        ? 'تحديثات أمنية متوفرة — يُنصح بالتثبيت قريباً'
-        : 'تعذّر التحقق من التحديثات',
-      detailsEnglish: noUpdates
-        ? 'System fully up to date'
-        : hasUpdates
-        ? 'Security updates available — install soon'
-        : 'Could not check updates',
+      status: isRecent ? 'pass' : 'warn',
+      detailsArabic: isRecent
+        ? `آخر تحديث ناجح قبل ${daysSince} يوم — ضمن السياسة المقبولة (≤30 يوم)`
+        : `آخر تحديث ناجح قبل ${daysSince} يوم — يجب تطبيق التحديثات الأمنية`,
+      detailsEnglish: isRecent
+        ? `Last update ${daysSince}d ago (within policy)`
+        : `Last update ${daysSince}d ago — needs updates`,
     };
   } catch {
     return unknownCheck('os_updates', 'NCA-ECC-2-T6-2', 'تحديثات النظام');
