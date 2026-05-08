@@ -46,7 +46,7 @@ User says "افتح Safari" → open Safari
 User says "غيّر الشبكة" → click menu-bar Wi-Fi icon, switch network
 User says "أعد تشغيل X" → quit app via cmd+q from menu, reopen via Spotlight
 
-User says "افحصي اتصال الإنترنت" / "ping" / "تشخيص الشبكة" → run a ping diagnostic in Terminal:
+User says "افحصي اتصال الإنترنت" / "تأكدي من الإنترنت" / "ping" / "تشخيص الشبكة" → run a ping diagnostic in Terminal:
   1. key("cmd+space")           → Spotlight
   2. type("Terminal")
   3. key("Return")               → Terminal opens

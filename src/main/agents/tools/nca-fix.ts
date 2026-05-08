@@ -128,7 +128,7 @@ async function pause(ms: number): Promise<void> {
 export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAndFixReport> {
   // Phase 1: audit (announce each check as it runs)
   if (onStep) {
-    await onStep('بدء التدقيق الأمني وفق NCA-ECC...');
+    await onStep('بدء فحص الأمان وفق معايير NCA...');
     await pause(STEP_PAUSE_MS);
   }
   const beforeReport = await runNcaAudit();
@@ -138,14 +138,14 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
       await onStep(`${icon} ${c.titleArabic} (${c.ncaRef})`);
       await pause(STEP_PAUSE_MS);
     }
-    await onStep(`النتيجة قبل المعالجة: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
+    await onStep(`النتيجة قبل الإصلاح: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
     await pause(STEP_PAUSE_MS);
   }
 
   // Phase 2: apply remediations
   const fixes: FixOutcome[] = [];
   if (onStep && beforeReport.failCount + beforeReport.warnCount > 0) {
-    await onStep('بدء المعالجة التلقائية للعناصر الآمنة...');
+    await onStep('بدء الإصلاح التلقائي للعناصر الآمنة...');
     await pause(STEP_PAUSE_MS);
   }
   for (const check of beforeReport.checks) {
@@ -180,20 +180,20 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
 
   // Phase 3: re-audit
   if (onStep) {
-    await onStep('إعادة التدقيق للتحقق من النتائج...');
+    await onStep('إعادة الفحص للتحقق من النتائج...');
     await pause(STEP_PAUSE_MS);
   }
   const afterReport = await runNcaAudit();
 
   // Build a bilingual summary of what changed
   const lines: string[] = [];
-  lines.push('═══ تدقيق NCA-ECC مع المعالجة التلقائية ═══');
+  lines.push('═══ فحص الأمان مع الإصلاح التلقائي ═══');
   lines.push('');
-  lines.push(`النتيجة قبل المعالجة: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
+  lines.push(`النتيجة قبل الإصلاح: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
   lines.push('');
-  lines.push('الإجراءات التي اتخذها الوكيل:');
+  lines.push('ما قام به الوكيل:');
   if (fixes.length === 0) {
-    lines.push('  لا توجد مشاكل تتطلب معالجة 🎉');
+    lines.push('  لا توجد مشاكل تحتاج إصلاح 🎉');
   } else {
     for (const f of fixes) {
       const icon =
@@ -203,14 +203,14 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
     }
   }
   lines.push('');
-  lines.push(`النتيجة بعد المعالجة: ${afterReport.passCount}/${afterReport.totalChecks}`);
+  lines.push(`النتيجة بعد الإصلاح: ${afterReport.passCount}/${afterReport.totalChecks}`);
   const improvement = afterReport.passCount - beforeReport.passCount;
   if (improvement > 0) {
-    lines.push(`📈 تحسّنت بمقدار ${improvement} نقطة`);
+    lines.push(`📈 تحسّن بمقدار ${improvement} نقطة`);
   } else if (afterReport.failCount > 0) {
     const remaining = afterReport.failCount + afterReport.warnCount;
     lines.push(
-      `⚠️ تبقّى ${remaining} عنصر يتطلّب تدخّلك (فُتحت لكِ الإعدادات اللازمة)`,
+      `⚠️ بقي ${remaining} عنصر يحتاج تدخّلك (فُتحت لكِ الإعدادات اللازمة)`,
     );
   }
   const summaryArabic = lines.join('\n');

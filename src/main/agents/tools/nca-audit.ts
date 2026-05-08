@@ -1,8 +1,7 @@
-// NCA Security Compliance Audit — runs five real checks against the
-// macOS device and reports whether each meets Saudi NCA Essential
+// NCA Security Check — runs five real checks against the macOS
+// device and reports whether each meets Saudi NCA Essential
 // Cybersecurity Controls (ECC). Produces a bilingual Arabic+English
-// summary suitable for showing to the user and attaching to an audit
-// ticket.
+// summary suitable for showing to the user.
 //
 // Each check is a single shell command. Total runtime: ~3-5 seconds.
 
@@ -44,8 +43,8 @@ async function checkFileVault(): Promise<AuditCheck> {
       titleArabic: 'تشفير القرص (FileVault)',
       status: isOn ? 'pass' : 'fail',
       detailsArabic: isOn
-        ? 'تشفير FileVault مُفعّل — يحمي بيانات الجهاز إذا فُقد أو سُرق'
-        : 'تشفير FileVault مُعطّل — يجب تفعيله من إعدادات النظام → الخصوصية والأمان',
+        ? 'تشفير القرص مُفعّل — بياناتك محمية لو فُقد الجهاز'
+        : 'تشفير القرص مُعطّل — يحتاج تفعيل من إعدادات النظام',
       detailsEnglish: isOn ? 'FileVault is enabled' : 'FileVault is disabled',
     };
   } catch {
@@ -65,8 +64,8 @@ async function checkScreenLock(): Promise<AuditCheck> {
       titleArabic: 'قفل الشاشة التلقائي',
       status: requiresPassword ? 'pass' : 'fail',
       detailsArabic: requiresPassword
-        ? 'يُطلب كلمة السر عند إيقاظ الشاشة — متوافق مع متطلبات NCA'
-        : 'لا يُطلب كلمة سر عند إيقاظ الشاشة — يجب تفعيله',
+        ? 'يُطلب كلمة السر عند العودة من الشاشة المؤمَّنة — مطابق لمعايير NCA'
+        : 'لا يُطلب كلمة سر عند العودة من الشاشة المؤمَّنة — يحتاج تفعيل',
       detailsEnglish: requiresPassword
         ? 'Password required after screen lock'
         : 'No password required after screen lock — must be enabled',
@@ -91,7 +90,7 @@ async function checkFirewall(): Promise<AuditCheck> {
       status: isOn ? 'pass' : 'fail',
       detailsArabic: isOn
         ? `جدار الحماية مُفعّل (المستوى ${state}) — يحجب الاتصالات غير المصرّح بها`
-        : 'جدار الحماية مُعطّل — يجب تفعيله من إعدادات النظام → الشبكة',
+        : 'جدار الحماية مُعطّل — يحتاج تفعيل من إعدادات الشبكة',
       detailsEnglish: isOn ? `Firewall ON (level ${state})` : 'Firewall OFF',
     };
   } catch {
@@ -127,8 +126,8 @@ async function checkUpdates(): Promise<AuditCheck> {
       titleArabic: 'تحديثات نظام التشغيل',
       status: isRecent ? 'pass' : 'warn',
       detailsArabic: isRecent
-        ? `آخر تحديث ناجح قبل ${daysSince} يوم — ضمن السياسة المقبولة (≤30 يوم)`
-        : `آخر تحديث ناجح قبل ${daysSince} يوم — يجب تطبيق التحديثات الأمنية`,
+        ? `آخر تحديث قبل ${daysSince} يوم — ضمن النطاق المقبول (≤30 يوم)`
+        : `آخر تحديث قبل ${daysSince} يوم — تحتاجين تطبيق التحديثات الأمنية`,
       detailsEnglish: isRecent
         ? `Last update ${daysSince}d ago (within policy)`
         : `Last update ${daysSince}d ago — needs updates`,
@@ -197,7 +196,7 @@ export async function runNcaAudit(): Promise<AuditReport> {
 
   // Build the bilingual summary
   const lines: string[] = [];
-  lines.push('═══ تقرير الامتثال للأمن السيبراني (NCA-ECC) ═══');
+  lines.push('═══ تقرير فحص الأمان (وفق معايير NCA) ═══');
   lines.push('');
   for (const c of checks) {
     const icon = c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚠️';
@@ -209,10 +208,10 @@ export async function runNcaAudit(): Promise<AuditReport> {
   lines.push(`النتيجة: ${passCount} ✅ / ${failCount} ❌ / ${warnCount} ⚠️`);
   lines.push(
     overallStatus === 'compliant'
-      ? '✅ الجهاز متوافق بالكامل مع متطلبات NCA الأساسية'
+      ? '✅ الجهاز مطابق بالكامل لمعايير الأمن السيبراني'
       : overallStatus === 'partial'
-      ? '⚠️ الجهاز متوافق جزئياً — تحقق من التحذيرات أعلاه'
-      : '❌ الجهاز غير متوافق — يجب معالجة المخالفات لتلبية متطلبات NCA',
+      ? '⚠️ الجهاز مطابق جزئياً — راجعي التنبيهات أعلاه'
+      : '❌ الجهاز يحتاج معالجة لرفع مستوى الأمان',
   );
   const summaryArabic = lines.join('\n');
 

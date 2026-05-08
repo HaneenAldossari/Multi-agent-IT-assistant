@@ -148,6 +148,8 @@ const SYSTEM_PROMPT = `You are an autonomous Memory agent. You analyze past tick
     - إغلاق تطبيق → tool="quitApp"
     - إعادة تشغيل تطبيق معلّق → tool="restartApp"
     - تحويل شبكة Wi-Fi لشبكة معروفة → tool="switchWifi", args={"ssid": "Office-WiFi"}
+    - فحص أمان الجهاز وفق معايير NCA + إصلاح المشاكل الآمنة → tool="ncaAuditAndFix", args={}
+    - فحص أمان الجهاز فقط (بدون إصلاح) → tool="ncaAudit", args={}
 
 (ب) "computer_use" — استخدم Computer Use (15-30 ثانية). اختر هذا للمهام التي تحتاج تنقّلًا بصرياً معقدًا أو سيناريوهات لم نرها من قبل.
 

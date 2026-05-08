@@ -6,14 +6,19 @@ If you change a scenario here, both Memory's KB (`data/company-tickets.json`) an
 
 ---
 
-## Scenario A — NCA Compliance Audit & Auto-Fix
+## Scenario A — Security Check & Auto-Fix (NCA-aligned)
 *"Resolver scripted with multi-step visible work"*
 
 ### Voice trigger (Arabic)
 The user says one of:
-- **"افحص جهازي وأصلح مشاكل الامتثال"**
-- **"اجعل جهازي متوافق مع NCA"**
-- **"هل جهازي متوافق مع متطلبات الأمن السيبراني؟"**
+- **"افحصي إعدادات الأمان في جهازي وأصلحي المشاكل"**
+- **"تأكدي إن جهازي مطابق لمتطلبات الأمن السيبراني السعودي"**
+- **"افحصي أمان جهازي وفق معايير NCA"**
+
+### Polished Arabic phrasing notes
+- Use "**فحص الأمان**" (security check) instead of "تدقيق الامتثال" (compliance audit) — cleaner, more natural
+- Use "**مطابق / غير مطابق**" instead of "متوافق / غير متوافق" — more accurate Arabic
+- Use "**معايير NCA**" instead of "ضوابط NCA" — natural everyday phrasing
 
 ### Expected flow
 
