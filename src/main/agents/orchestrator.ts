@@ -137,13 +137,27 @@ export async function handleUserRequest(
     );
     emit(onAgentMessage, 'reporter', 'thinking', 'يجمّع الرسالة النهائية مع البديل...');
 
-    const altLine = guardianPre.suggestedAlternativeArabic
-      ? `\n\n💡 البديل المقترح: ${guardianPre.suggestedAlternativeArabic}`
-      : '';
-    const finalUserMessage =
-      `🛑 تم الحجب: ${guardianPre.rationaleArabic}` +
-      `\n📜 المرجع: ${guardianPre.policyReference}` +
-      altLine;
+    // Strip any embedded "البديل المقترح: ..." from the rationale so we
+    // don't show the alternative twice (Guardian's prompt sometimes
+    // appends it inline; we want the alternative in its own section).
+    const cleanRationale = guardianPre.rationaleArabic
+      .replace(/البديل المقترح[:：].*$/s, '')
+      .trim();
+    const sections: string[] = [];
+    sections.push('🛑 الإجراء محجوب');
+    sections.push('━━━━━━━━━━━━━━━━━━━━');
+    sections.push('');
+    sections.push('❓ السبب');
+    sections.push(cleanRationale);
+    sections.push('');
+    sections.push('📜 مرجع السياسة');
+    sections.push(guardianPre.policyReference);
+    if (guardianPre.suggestedAlternativeArabic) {
+      sections.push('');
+      sections.push('✅ البديل المعتمد');
+      sections.push(guardianPre.suggestedAlternativeArabic);
+    }
+    const finalUserMessage = sections.join('\n');
 
     emit(onAgentMessage, 'reporter', 'done', 'تم تسليم الرد مع البديل');
     emit(onAgentMessage, 'memory', 'done', memory.summaryArabic);
