@@ -40,6 +40,36 @@
     "playbook": "nca_audit_and_fix"
   },
   {
+    "id": "INC-2024-1364",
+    "date": "2024-11-11",
+    "user_role": "موظف",
+    "symptom_arabic": "تحققي من توافق جهازي مع NCA",
+    "diagnosis": "فحص توافق الجهاز مع ضوابط NCA-ECC وإصلاح المشاكل الآمنة",
+    "resolution_method": "scripted",
+    "scripted_tool": "ncaAuditAndFix",
+    "scripted_args": {},
+    "resolution_steps": "فحص + إصلاح تلقائي + إعادة فحص + تقرير قبل/بعد",
+    "outcome": "resolved",
+    "resolution_time_seconds": 7,
+    "category": "security_check",
+    "playbook": "nca_audit_and_fix"
+  },
+  {
+    "id": "INC-2024-1365",
+    "date": "2024-11-11",
+    "user_role": "موظف",
+    "symptom_arabic": "تحقق من توافق الجهاز مع معايير NCA",
+    "diagnosis": "طلب فحص توافق NCA-ECC",
+    "resolution_method": "scripted",
+    "scripted_tool": "ncaAuditAndFix",
+    "scripted_args": {},
+    "resolution_steps": "فحص + إصلاح تلقائي + إعادة فحص",
+    "outcome": "resolved",
+    "resolution_time_seconds": 7,
+    "category": "security_check",
+    "playbook": "nca_audit_and_fix"
+  },
+  {
     "id": "INC-2024-1362",
     "date": "2024-11-11",
     "user_role": "موظف",

@@ -10,10 +10,13 @@ If you change a scenario here, both Memory's KB (`data/company-tickets.json`) an
 *"Resolver scripted with multi-step visible work"*
 
 ### Voice trigger (Arabic)
-The user says one of:
-- **"افحصي إعدادات الأمان في جهازي وأصلحي المشاكل"**
-- **"تأكدي إن جهازي مطابق لمتطلبات الأمن السيبراني السعودي"**
-- **"افحصي أمان جهازي وفق معايير NCA"**
+**Official demo prompt:**
+- **"تحققي من توافق جهازي مع NCA"** ← use this in the recording
+
+Other accepted variants (all route to `ncaAuditAndFix`):
+- "افحصي إعدادات الأمان في جهازي وأصلحي المشاكل"
+- "تأكدي إن جهازي مطابق لمتطلبات الأمن السيبراني السعودي"
+- "افحصي أمان جهازي وفق معايير NCA"
 
 ### Polished Arabic phrasing notes
 - Use "**فحص الأمان**" (security check) instead of "تدقيق الامتثال" (compliance audit) — cleaner, more natural
