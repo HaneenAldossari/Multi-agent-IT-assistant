@@ -18,12 +18,13 @@ function tryGetAppPath(): string | null {
   }
 }
 
-// SDK is ESM-only; main process is CJS. Use dynamic import to avoid
-// `require()` of an ES module at load time.
+// SDK is ESM-only; main process is CJS. Function-eval'd dynamic import
+// so TS's CommonJS target doesn't rewrite import() into require().
 type AgentSDK = typeof import('@anthropic-ai/claude-agent-sdk');
+const _esmImport = new Function('m', 'return import(m)') as <T>(m: string) => Promise<T>;
 let sdkPromise: Promise<AgentSDK> | null = null;
 function loadSDK(): Promise<AgentSDK> {
-  if (!sdkPromise) sdkPromise = import('@anthropic-ai/claude-agent-sdk');
+  if (!sdkPromise) sdkPromise = _esmImport<AgentSDK>('@anthropic-ai/claude-agent-sdk');
   return sdkPromise;
 }
 

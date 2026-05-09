@@ -25,13 +25,14 @@ function tryGetAppPath(): string | null {
 }
 
 // Claude Agent SDK is shipped as an ES module; Flicky's main process is
-// CommonJS. Use a lazy dynamic import so `require()` doesn't choke on the
-// .mjs entry point at module load time.
+// CommonJS. We use a Function-eval'd dynamic import so TypeScript's
+// CJS compiler doesn't rewrite our import() into require().
 type AgentSDK = typeof import('@anthropic-ai/claude-agent-sdk');
+const _esmImport = new Function('m', 'return import(m)') as <T>(m: string) => Promise<T>;
 let sdkPromise: Promise<AgentSDK> | null = null;
 function loadSDK(): Promise<AgentSDK> {
   if (!sdkPromise) {
-    sdkPromise = import('@anthropic-ai/claude-agent-sdk');
+    sdkPromise = _esmImport<AgentSDK>('@anthropic-ai/claude-agent-sdk');
   }
   return sdkPromise;
 }
