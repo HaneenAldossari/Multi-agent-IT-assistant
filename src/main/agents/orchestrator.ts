@@ -75,7 +75,9 @@ export async function handleUserRequest(
   }
 
   // ── 1. Memory (real Claude Agent SDK call) ────────────────────────────
-  emit(onAgentMessage, 'memory', 'thinking', 'يبحث في سجل البلاغات السابقة...');
+  emit(onAgentMessage, 'memory', 'thinking', `📝 سمعت: "${voiceTranscript.slice(0, 80)}"`);
+  await new Promise((r) => setTimeout(r, 600)); // brief readable pause
+  emit(onAgentMessage, 'memory', 'thinking', '🔍 يبحث في سجل البلاغات السابقة...');
   // Pre-extract foreground app + window title so Memory can route even
   // for vague voice queries like "هذا ما يشتغل". Cheap (~100ms),
   // text-only, no image processing.
@@ -83,7 +85,16 @@ export async function handleUserRequest(
   if (screenContext) console.log(`[orchestrator] ${screenContext}`);
   const memory = await runMemoryAgent(voiceTranscript, anthropicKey, screenContext ?? undefined);
   if (signal.aborted) return null;
-  emit(onAgentMessage, 'memory', 'active', memory.summaryArabic);
+  // Tell the user WHAT memory understood + WHAT it'll do next.
+  const planText =
+    memory.recommendedPath === 'scripted' && memory.scriptedTool
+      ? `📋 ${memory.summaryArabic}\n→ سأستخدم ${memory.scriptedTool}`
+      : memory.recommendedPath === 'computer_use'
+        ? `📋 ${memory.summaryArabic}\n→ سأستكشف عبر التحكم البصري`
+        : memory.recommendedPath === 'escalate'
+          ? `📋 ${memory.summaryArabic}\n→ سيتم التصعيد`
+          : `📋 ${memory.summaryArabic}`;
+  emit(onAgentMessage, 'memory', 'active', planText);
   console.log(`[orchestrator] Memory: path=${memory.recommendedPath} confidence=${memory.confidence}`);
 
   // If Memory recommends escalation (e.g. password reset, install software,

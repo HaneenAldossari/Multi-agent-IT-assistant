@@ -51,23 +51,39 @@ async function fixScreenLock(): Promise<FixOutcome> {
 }
 
 async function openFirewallSettings(): Promise<FixOutcome> {
+  // Try to ACTUALLY enable the firewall via socketfilterfw with admin
+  // privileges. macOS will pop a single password dialog — the user types
+  // their password once and the firewall turns on for real.
+  // Falls back to opening Settings if the privileged command fails.
   try {
-    // Opens System Settings → Network → Firewall on Sonoma+
-    // (older macOS: opens Security & Privacy → Firewall pane)
-    await execAsync('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
+    await execAsync(
+      `osascript -e 'do shell script "/usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on" with administrator privileges with prompt "تفعيل جدار الحماية (NCA-ECC-2-T5-1)"'`,
+    );
     return {
       id: 'firewall',
       titleArabic: 'جدار الحماية',
-      result: 'opened_settings',
-      detailsArabic: 'فتحت إعدادات جدار الحماية — اضغطي "تشغيل" لتفعيله (يحتاج كلمة سر المسؤول)',
+      result: 'fixed',
+      detailsArabic: 'تم تفعيل جدار الحماية بنجاح',
     };
   } catch {
-    return {
-      id: 'firewall',
-      titleArabic: 'جدار الحماية',
-      result: 'skipped',
-      detailsArabic: 'تعذّر فتح إعدادات جدار الحماية',
-    };
+    // Fallback: user cancelled or admin command unavailable — open the
+    // Settings pane so they can finish manually.
+    try {
+      await execAsync('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
+      return {
+        id: 'firewall',
+        titleArabic: 'جدار الحماية',
+        result: 'opened_settings',
+        detailsArabic: 'فتحت إعدادات جدار الحماية — اضغطي "تشغيل" لتفعيله',
+      };
+    } catch {
+      return {
+        id: 'firewall',
+        titleArabic: 'جدار الحماية',
+        result: 'skipped',
+        detailsArabic: 'تعذّر تفعيل جدار الحماية تلقائياً',
+      };
+    }
   }
 }
 
