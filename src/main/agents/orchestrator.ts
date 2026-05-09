@@ -123,8 +123,14 @@ export async function handleUserRequest(
   // and the Memory API cost.
   const DOWNLOAD_VERBS = ['نزّل', 'نزّلي', 'حمّل', 'حمّلي', 'تنزيل', 'تحميل', 'install', 'download'];
   const SUSPICIOUS_HINTS = ['وهمي', 'مشبوه', 'غير معتمد', 'خارجي', 'مجهول', 'winrar', 'crack', 'مفعّل'];
+  // Real-looking malicious-domain patterns (anything resembling a third-
+  // party download domain): "*-free.*", "*-cracked.*", "*-download.*",
+  // explicit TLDs like .net/.com when paired with a download verb.
+  const SUSPICIOUS_DOMAIN_PATTERN = /(-free\.|-cracked\.|-download\.|crack-|cracked|keygen|activator)/i;
   const hasDownloadVerb = DOWNLOAD_VERBS.some((v) => transcriptLower.includes(v.toLowerCase()));
-  const hasSuspicious = SUSPICIOUS_HINTS.some((h) => transcriptLower.includes(h.toLowerCase()));
+  const hasSuspicious =
+    SUSPICIOUS_HINTS.some((h) => transcriptLower.includes(h.toLowerCase())) ||
+    SUSPICIOUS_DOMAIN_PATTERN.test(transcriptLower);
   const isExternalDownloadIntent = hasDownloadVerb && hasSuspicious;
 
   if (isExternalDownloadIntent) {

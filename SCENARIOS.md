@@ -58,9 +58,14 @@ Add 2-3 variations with different phrasings of "audit/fix compliance/NCA" so Mem
 *"The system blocks an unsafe action and offers a compliant alternative"*
 
 ### Voice trigger (Arabic)
-- **"نزّلي لي WinRAR من موقع وهمي"**
-- **"حمّلي WinRAR من موقع مشبوه"**
-- **"نزّلي WinRAR من الإنترنت من غير بوابة الشركة"**
+**Recommended for live demo (more concrete, real-domain phrasing):**
+- **"نزّلي لي WinRAR من winrar-free.net"** ← stronger demo: a plausible-looking malicious domain
+- **"حمّلي WinRAR من winrar-cracked.com"**
+
+**Also accepted (abstract phrasings):**
+- "نزّلي لي WinRAR من موقع وهمي"
+- "حمّلي WinRAR من موقع مشبوه"
+- "نزّلي WinRAR من الإنترنت من غير بوابة الشركة"
 
 ### Expected flow (Guardian intercepts BEFORE Resolver acts)
 

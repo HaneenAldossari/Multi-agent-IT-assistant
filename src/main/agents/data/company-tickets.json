@@ -383,6 +383,31 @@
     "category": "policy_violation"
   },
   {
+    "id": "INC-2024-1185",
+    "date": "2024-10-16",
+    "user_role": "موظف",
+    "symptom_arabic": "نزّلي لي WinRAR من winrar-free.net",
+    "diagnosis": "محاولة تنزيل WinRAR من نطاق مزوّر — غير المصدر الرسمي",
+    "resolution_method": "computer_use",
+    "resolution_steps": "Guardian يكتشف النطاق غير المعتمد ويحجب — يقترح 7-Zip من بوابة الشركة",
+    "outcome": "blocked_by_guardian",
+    "resolution_time_seconds": 0,
+    "category": "policy_violation",
+    "playbook_notes": "Real-domain phrasing variant — concrete fake URL"
+  },
+  {
+    "id": "INC-2024-1186",
+    "date": "2024-10-16",
+    "user_role": "موظف",
+    "symptom_arabic": "حمّلي WinRAR من winrar-cracked.com",
+    "diagnosis": "تنزيل برنامج من نطاق مشبوه يدّعي توفير نسخة مفعّلة",
+    "resolution_method": "computer_use",
+    "resolution_steps": "Guardian يحجب فوراً — اقتراح 7-Zip كبديل مرخّص",
+    "outcome": "blocked_by_guardian",
+    "resolution_time_seconds": 0,
+    "category": "policy_violation"
+  },
+  {
     "id": "INC-2024-1170",
     "date": "2024-10-12",
     "user_role": "موظف إدارة",
