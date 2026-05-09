@@ -6,6 +6,9 @@
 import './styles/design-system.css';
 import './styles/agent-panel.css';
 
+// Three-agent panel: Memory / Resolver / Guardian. The orchestrator
+// still emits "reporter" events from the legacy code path; the renderer
+// silently drops them since there's no row for that agent anymore.
 type AgentId = 'memory' | 'resolver' | 'guardian' | 'reporter';
 
 interface Step {
@@ -17,32 +20,43 @@ interface Step {
 const root = document.getElementById('root') as HTMLDivElement;
 const footer = document.getElementById('footer') as HTMLDivElement;
 
-const rows: Record<AgentId, HTMLLIElement> = {
-  memory:   document.querySelector<HTMLLIElement>('.ap-row[data-agent="memory"]')!,
-  resolver: document.querySelector<HTMLLIElement>('.ap-row[data-agent="resolver"]')!,
-  guardian: document.querySelector<HTMLLIElement>('.ap-row[data-agent="guardian"]')!,
-  reporter: document.querySelector<HTMLLIElement>('.ap-row[data-agent="reporter"]')!,
+// Reporter row was removed — querySelector returns null, so we
+// type the map as nullable and guard every access. Any legacy events
+// for "reporter" become no-ops.
+const rows: Record<AgentId, HTMLLIElement | null> = {
+  memory:   document.querySelector<HTMLLIElement>('.ap-row[data-agent="memory"]'),
+  resolver: document.querySelector<HTMLLIElement>('.ap-row[data-agent="resolver"]'),
+  guardian: document.querySelector<HTMLLIElement>('.ap-row[data-agent="guardian"]'),
+  reporter: document.querySelector<HTMLLIElement>('.ap-row[data-agent="reporter"]'),
 };
 
 function setStatus(agent: AgentId, text: string): void {
-  const status = rows[agent].querySelector<HTMLDivElement>('.ap-status');
+  const row = rows[agent];
+  if (!row) return;
+  const status = row.querySelector<HTMLDivElement>('.ap-status');
   if (status) status.textContent = text;
 }
 
 function startThinking(agent: AgentId): void {
-  rows[agent].classList.remove('is-active');
-  rows[agent].classList.add('is-thinking');
+  const row = rows[agent];
+  if (!row) return;
+  row.classList.remove('is-active');
+  row.classList.add('is-thinking');
 }
 
 function setMessage(agent: AgentId, text: string): void {
-  rows[agent].classList.remove('is-thinking');
-  rows[agent].classList.add('is-active');
+  const row = rows[agent];
+  if (!row) return;
+  row.classList.remove('is-thinking');
+  row.classList.add('is-active');
   setStatus(agent, text);
 }
 
 function resetAll(): void {
   for (const id of Object.keys(rows) as AgentId[]) {
-    rows[id].classList.remove('is-thinking', 'is-active');
+    const row = rows[id];
+    if (!row) continue;
+    row.classList.remove('is-thinking', 'is-active');
     setStatus(id, 'في الانتظار...');
   }
   footer.classList.remove('is-shown');
