@@ -26,6 +26,13 @@ export function StreamApp() {
   const bodyRef = useRef<HTMLDivElement>(null);
   /** Tracks the in-progress turn so chunks can append to it. */
   const currentIdRef = useRef<string | null>(null);
+  /** Buffer of characters waiting to be typed out, plus a pump timer.
+   * Gives a real progressive feel even when chunks arrive in bursts —
+   * so the user sees each line appear before the next one overtakes it,
+   * instead of a wall of text dropping at once. */
+  const typeBufferRef = useRef<string>('');
+  const typeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingFinalRef = useRef<string | null>(null);
 
   // Load existing history once so the stream window isn't empty on open.
   useEffect(() => {
@@ -66,28 +73,81 @@ export function StreamApp() {
       ]);
     });
 
+    const startTypePump = () => {
+      if (typeTimerRef.current) return;
+      typeTimerRef.current = setInterval(() => {
+        const id = currentIdRef.current;
+        const buf = typeBufferRef.current;
+        if (!id) {
+          // Turn ended — flush any buffered chars then stop.
+          stopTypePump();
+          return;
+        }
+        if (buf.length === 0) {
+          // Nothing buffered. If a final-text replacement is queued and
+          // chars are drained, apply it now and stop.
+          if (pendingFinalRef.current !== null) {
+            const fullText = pendingFinalRef.current;
+            pendingFinalRef.current = null;
+            setTurns((prev) =>
+              prev.map((t) =>
+                t.id === id ? { ...t, ai: fullText, streaming: false } : t,
+              ),
+            );
+            currentIdRef.current = null;
+            stopTypePump();
+          }
+          return;
+        }
+        // Pop a small batch each tick. Tune CHARS_PER_TICK to taste —
+        // higher = faster typing, lower = more obvious "streaming" feel.
+        const CHARS_PER_TICK = 3;
+        const toEmit = buf.slice(0, CHARS_PER_TICK);
+        typeBufferRef.current = buf.slice(CHARS_PER_TICK);
+        setTurns((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, ai: t.ai + toEmit } : t)),
+        );
+      }, 28); // ~28ms × 3 chars = ~107 chars/sec — fast but visibly streaming
+    };
+    const stopTypePump = () => {
+      if (typeTimerRef.current) {
+        clearInterval(typeTimerRef.current);
+        typeTimerRef.current = null;
+      }
+    };
+
     const unsubChunk = window.flicky.onAiResponseChunk((chunk: string) => {
-      const id = currentIdRef.current;
-      if (!id) return;
-      setTurns((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ai: t.ai + chunk } : t)),
-      );
+      if (!currentIdRef.current) return;
+      typeBufferRef.current += chunk;
+      startTypePump();
     });
 
     const unsubComplete = window.flicky.onAiResponseComplete((fullText: string) => {
       const id = currentIdRef.current;
       if (!id) return;
-      setTurns((prev) =>
-        prev.map((t) =>
-          t.id === id ? { ...t, ai: fullText, streaming: false } : t,
-        ),
-      );
-      currentIdRef.current = null;
+      // If chars are still being typed, queue the final replacement so
+      // it lands AFTER the typewriter drains. If nothing's buffered,
+      // apply immediately. Either way the bubble ends with the canonical
+      // full text and `streaming: false`.
+      if (typeBufferRef.current.length > 0) {
+        pendingFinalRef.current = fullText;
+      } else {
+        setTurns((prev) =>
+          prev.map((t) =>
+            t.id === id ? { ...t, ai: fullText, streaming: false } : t,
+          ),
+        );
+        currentIdRef.current = null;
+        stopTypePump();
+      }
     });
 
     const unsubClear = window.flicky.onClearStream(() => {
       setTurns([]);
       currentIdRef.current = null;
+      typeBufferRef.current = '';
+      pendingFinalRef.current = null;
+      stopTypePump();
     });
 
     return () => {
@@ -96,14 +156,20 @@ export function StreamApp() {
       unsubChunk();
       unsubComplete();
       unsubClear();
+      stopTypePump();
     };
   }, []);
 
-  // Auto-scroll to bottom whenever content grows.
+  // Auto-scroll to bottom on new content — but only if the user is
+  // already near the bottom. If they've scrolled up to re-read an
+  // earlier chunk, don't fight them.
   useEffect(() => {
     const el = bodyRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 80) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    }
   }, [turns]);
 
   const statusLabel =
