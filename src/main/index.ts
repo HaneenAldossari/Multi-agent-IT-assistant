@@ -154,6 +154,12 @@ app.whenReady().then(() => {
       if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
         agentPanelWindow.webContents.send(IPC.AGENT_MESSAGE, msg);
       }
+      // Activity = keep the panel alive. Reset the hide timer on every
+      // event so the panel doesn't disappear mid-flow (e.g. while the
+      // user is reading instructions or interacting with a Settings
+      // pane during an NCA fix). The timer only fires 12.5 s after the
+      // LAST event, which is when the orchestrator is truly idle.
+      bumpAgentPanelHideTimer();
     },
   });
 
@@ -528,14 +534,24 @@ function showAgentPanel(): void {
   if (!agentPanelWindow || agentPanelWindow.isDestroyed()) return;
   agentPanelWindow.showInactive();
   agentPanelWindow.webContents.send(IPC.SHOW_AGENT_PANEL);
+  bumpAgentPanelHideTimer();
+}
+
+/**
+ * Reset the auto-hide countdown. Called on every onAgentMessage so the
+ * panel stays visible as long as the orchestrator is emitting work.
+ * The longer 30s grace gives users time to interact with Settings panes
+ * (e.g. clicking Update Now in Software Update) without the panel
+ * disappearing while they read the instructions.
+ */
+function bumpAgentPanelHideTimer(): void {
   if (agentPanelHideTimer) clearTimeout(agentPanelHideTimer);
-  // 12s timeline + small tail for the fade-out.
   agentPanelHideTimer = setTimeout(() => {
     if (agentPanelWindow && !agentPanelWindow.isDestroyed()) {
       agentPanelWindow.hide();
     }
     agentPanelHideTimer = null;
-  }, 12500);
+  }, 30000);
 }
 
 /**
