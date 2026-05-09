@@ -146,7 +146,8 @@ async function openSoftwareUpdate(): Promise<FixOutcome> {
       id: 'os_updates',
       titleArabic: 'تحديثات النظام',
       result: 'opened_settings',
-      detailsArabic: 'فتحت Software Update — راجعي التحديثات المتوفرة وثبّتيها لاحقاً',
+      detailsArabic:
+        'افتحت Software Update — اضغطي زر "Update Now" أو "Install" لكل تحديث متوفّر',
     };
   } catch {
     return {
@@ -166,7 +167,7 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
       titleArabic: 'تشفير القرص (FileVault)',
       result: 'opened_settings',
       detailsArabic:
-        '⚠️ FileVault تفعيله يتطلب احتفاظك بمفتاح الاستعادة — لن أفعّله تلقائياً. فتحت لكِ الإعدادات لتراجعيها بنفسك.',
+        'افتحت إعدادات FileVault — راجعي الإعدادات لكن لا تضغطي "Turn On" قبل حفظ مفتاح الاسترجاع في مكان آمن',
     };
   } catch {
     return {
@@ -187,7 +188,8 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
  */
 export type StepCallback = (text: string) => Promise<void> | void;
 
-const STEP_PAUSE_MS = 500; // human-readable pacing between updates
+const STEP_PAUSE_MS = 250; // human-readable pacing between updates
+const POST_OPEN_SETTINGS_MS = 2500; // extra pause after opening a Settings pane so user can read the instruction
 
 async function pause(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
@@ -283,16 +285,18 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
     }
     fixes.push(outcome);
 
-    // Narrate the result.
+    // Narrate the result. When we open a Settings pane the user actually
+    // needs time to look at it, so use a longer pause for that case so
+    // the instruction text doesn't get overwritten by the next step.
     if (onStep) {
       const icon = outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
       await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
-      await pause(STEP_PAUSE_MS);
+      await pause(outcome.result === 'opened_settings' ? POST_OPEN_SETTINGS_MS : STEP_PAUSE_MS);
     }
   }
 
   // Small pause to let `defaults write` propagate before re-checking
-  await pause(800);
+  await pause(400);
 
   // Phase 3: re-audit
   if (onStep) {
