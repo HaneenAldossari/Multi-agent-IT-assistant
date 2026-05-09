@@ -116,6 +116,82 @@ export async function handleUserRequest(
     };
   }
 
+  // ── 0b. Fast-path: external-download intent (Scenario B) ─────────────
+  // Recognizes "نزّلي/حمّلي WinRAR/برنامج من موقع وهمي/مشبوه/خارجي".
+  // We SKIP Memory (its only job here would be to say low-confidence),
+  // but we KEEP Guardian — Guardian's block IS the demo. Saves ~10 s
+  // and the Memory API cost.
+  const DOWNLOAD_VERBS = ['نزّل', 'نزّلي', 'حمّل', 'حمّلي', 'تنزيل', 'تحميل', 'install', 'download'];
+  const SUSPICIOUS_HINTS = ['وهمي', 'مشبوه', 'غير معتمد', 'خارجي', 'مجهول', 'winrar', 'crack', 'مفعّل'];
+  const hasDownloadVerb = DOWNLOAD_VERBS.some((v) => transcriptLower.includes(v.toLowerCase()));
+  const hasSuspicious = SUSPICIOUS_HINTS.some((h) => transcriptLower.includes(h.toLowerCase()));
+  const isExternalDownloadIntent = hasDownloadVerb && hasSuspicious;
+
+  if (isExternalDownloadIntent) {
+    sayChunk(`حسناً، فهمتُ طلبك — تنزيل برنامج من مصدر خارجي. لحظة، أراجع السياسات.\n\n`);
+    emit(
+      onAgentMessage,
+      'memory',
+      'active',
+      '⚠️ مطابقة مباشرة: تنزيل من مصدر خارجي — يحتاج مراجعة الحارس',
+    );
+    emit(onAgentMessage, 'resolver', 'thinking', 'بانتظار قرار الحارس قبل التنفيذ...');
+
+    // Run Guardian for real — this IS the demo value.
+    emit(onAgentMessage, 'guardian', 'thinking', 'يبحث في سياسات NCA-ECC...');
+    const intentDescription =
+      `طلب المستخدم: "${voiceTranscript}". تحليل أوّلي: تنزيل برنامج من مصدر خارجي يحتاج مراجعة سياسات.`;
+    const guardianBlock = await runGuardianAgent(intentDescription, anthropicKey);
+    if (signal.aborted) return null;
+
+    sayChunk(
+      `🛡️ **الحارس:** انتهيتُ من المراجعة — الإجراء **محجوب** وفق ${guardianBlock.policyReference}.\n\n`,
+    );
+
+    emit(onAgentMessage, 'guardian', 'active', guardianBlock.rationaleArabic);
+    emit(onAgentMessage, 'resolver', 'done', 'تم منع الإجراء قبل التنفيذ');
+
+    // Build the sectioned block message (same format as the regular block path).
+    const cleanRationale = guardianBlock.rationaleArabic
+      .replace(/البديل المقترح[:：].*$/s, '')
+      .trim();
+    const sections: string[] = [];
+    sections.push('🛑 الإجراء محجوب');
+    sections.push('━━━━━━━━━━━━━━━━━━━━');
+    sections.push('');
+    sections.push('❓ السبب');
+    sections.push(cleanRationale);
+    sections.push('');
+    sections.push('📜 مرجع السياسة');
+    sections.push(guardianBlock.policyReference);
+    if (guardianBlock.suggestedAlternativeArabic) {
+      sections.push('');
+      sections.push('✅ البديل المعتمد');
+      sections.push(guardianBlock.suggestedAlternativeArabic);
+      sayChunk(`✅ **البديل المعتمد:** ${guardianBlock.suggestedAlternativeArabic}\n\n`);
+    }
+    const finalUserMessage = sections.join('\n');
+
+    emit(onAgentMessage, 'guardian', 'done', '✓ الحجب نُفِّذ — البديل قُدِّم');
+    emit(onAgentMessage, 'memory', 'done', 'تم التعرّف على نوع الطلب');
+
+    // Open Google search for the safe alternative — "told you" → "showed you".
+    if (guardianBlock.suggestedSearchQuery) {
+      sayChunk(`🌐 أفتح Google الآن للوصول لمصدر تنزيل آمن للبديل...\n`);
+      const q = encodeURIComponent(guardianBlock.suggestedSearchQuery);
+      const url = `https://www.google.com/search?q=${q}`;
+      console.log(`[orchestrator] Opening alternative search: ${url}`);
+      try {
+        const { exec } = await import('child_process');
+        exec(`open "${url}"`);
+      } catch (err) {
+        console.error('[orchestrator] failed to open search URL:', err);
+      }
+    }
+
+    return { finalUserMessage, cursorTarget: null };
+  }
+
   // ── 1. Memory (real Claude Agent SDK call) ────────────────────────────
   // Greet the user immediately so the chat doesn't sit empty for 10+ s
   // while Memory's Claude API call runs.
