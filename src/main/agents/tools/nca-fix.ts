@@ -88,12 +88,13 @@ async function openFirewallSettings(): Promise<FixOutcome> {
     if (confirm.response !== 0) {
       // User chose to skip — open Settings so they can review manually.
       try {
-        await execAsync('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
+        await execAsync('open "x-apple.systempreferences:com.apple.Network-Settings.extension"');
         return {
           id: 'firewall',
           titleArabic: 'جدار الحماية',
           result: 'opened_settings',
-          detailsArabic: 'تخطّيتِ التفعيل التلقائي — فتحت لكِ إعدادات جدار الحماية',
+          detailsArabic:
+            'فتحت إعدادات الشبكة — مرّري لأسفل واضغطي "Firewall"، ثم فعّلي زر التشغيل',
         };
       } catch {
         return {
@@ -121,12 +122,13 @@ async function openFirewallSettings(): Promise<FixOutcome> {
     // osascript errored (user cancelled the password dialog, or admin
     // command unavailable) — open the Settings pane as a fallback.
     try {
-      await execAsync('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
+      await execAsync('open "x-apple.systempreferences:com.apple.Network-Settings.extension"');
       return {
         id: 'firewall',
         titleArabic: 'جدار الحماية',
         result: 'opened_settings',
-        detailsArabic: 'لم يتم التفعيل — فتحت لكِ الإعدادات لإكمالها يدوياً',
+        detailsArabic:
+          'لم يتم التفعيل التلقائي — فتحت إعدادات الشبكة، اضغطي "Firewall" ثم فعّلي زر التشغيل',
       };
     } catch {
       return {
@@ -140,14 +142,18 @@ async function openFirewallSettings(): Promise<FixOutcome> {
 }
 
 async function openSoftwareUpdate(): Promise<FixOutcome> {
+  // Modern macOS (Sonoma/Sequoia) URL — old `com.apple.preferences.softwareupdate`
+  // anchor still works but the new extension URL is more reliable.
   try {
-    await execAsync('open "x-apple.systempreferences:com.apple.preferences.softwareupdate"');
+    await execAsync(
+      'open "x-apple.systempreferences:com.apple.Software-Update-Settings.extension"',
+    );
     return {
       id: 'os_updates',
       titleArabic: 'تحديثات النظام',
       result: 'opened_settings',
       detailsArabic:
-        'افتحت Software Update — اضغطي زر "Update Now" أو "Install" لكل تحديث متوفّر',
+        'افتحت Software Update — إذا ظهر "Update Now" اضغطيه، أو اضغطي "More info" ثم اختاري التحديثات وثبّتيها',
     };
   } catch {
     return {
@@ -161,13 +167,15 @@ async function openSoftwareUpdate(): Promise<FixOutcome> {
 
 async function openFileVaultSettings(): Promise<FixOutcome> {
   try {
-    await execAsync('open "x-apple.systempreferences:com.apple.preference.security?FDE"');
+    await execAsync(
+      'open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_FDE"',
+    );
     return {
       id: 'filevault',
       titleArabic: 'تشفير القرص (FileVault)',
       result: 'opened_settings',
       detailsArabic:
-        'افتحت إعدادات FileVault — راجعي الإعدادات لكن لا تضغطي "Turn On" قبل حفظ مفتاح الاسترجاع في مكان آمن',
+        'افتحت إعدادات FileVault — انزلي إلى قسم "Security" واضغطي "FileVault" للمراجعة. لا تضغطي "Turn On" قبل حفظ مفتاح الاسترجاع في مكان آمن.',
     };
   } catch {
     return {
@@ -286,13 +294,17 @@ export async function runNcaAuditAndFix(
 
     // Conversational announcement of which fix is starting — appears in
     // the IT Assistant chat alongside the technical narration in the
-    // agents panel.
+    // agents panel. Each line includes WHERE it will open and (when
+    // relevant) what to click, so the user isn't dropped into Settings
+    // without context.
     if (onSay) {
       const sayBefore: Record<string, string> = {
-        screen_lock: `• قفل الشاشة الفوري — أفعّله الآن.\n`,
-        firewall: `• جدار الحماية — سيظهر مربّع تأكيد ثم طلب كلمة سر المسؤول.\n`,
-        os_updates: `• تحديثات النظام — سأفتح Software Update لكِ.\n`,
-        filevault: `• تشفير القرص (FileVault) — سأفتح الإعدادات للمراجعة فقط (لن يُفعَّل تلقائياً).\n`,
+        screen_lock: `• قفل الشاشة الفوري — أفعّله الآن (لا يحتاج تدخّلك).\n`,
+        firewall: `• جدار الحماية — سيظهر مربّع تأكيد، ثم طلب كلمة سر المسؤول لتفعيله تلقائياً (NCA-ECC-2-T5-1).\n`,
+        os_updates:
+          `• تحديثات النظام — سأفتح System Settings → General → Software Update. ابحثي عن زر "Update Now" أو "More info" وثبّتي التحديثات المتوفّرة.\n`,
+        filevault:
+          `• تشفير القرص (FileVault) — سأفتح Privacy & Security. لا تفعّلي FileVault قبل أن تحفظي مفتاح الاسترجاع في مكان آمن (خطر فقد البيانات).\n`,
       };
       const text = sayBefore[check.id];
       if (text) onSay(text);
