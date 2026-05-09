@@ -16,6 +16,23 @@ import { promisify } from 'util';
 import { runNcaAudit, type AuditReport } from './nca-audit';
 const execAsync = promisify(exec);
 
+// Lazy-load Electron's `dialog` so unit tests / standalone scripts can
+// import this module without an Electron context. Returns null when not
+// running inside Electron (the caller falls back to the no-confirm path).
+type ShowMessageBoxOptions = Electron.MessageBoxOptions;
+type ShowMessageBoxReturn = Electron.MessageBoxReturnValue;
+function tryGetDialog():
+  | { showMessageBox: (opts: ShowMessageBoxOptions) => Promise<ShowMessageBoxReturn> }
+  | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const electron = require('electron');
+    return electron?.dialog ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export type FixOutcome =
   | { id: string; titleArabic: string; result: 'fixed'; detailsArabic: string }
   | { id: string; titleArabic: string; result: 'opened_settings'; detailsArabic: string }
@@ -51,10 +68,45 @@ async function fixScreenLock(): Promise<FixOutcome> {
 }
 
 async function openFirewallSettings(): Promise<FixOutcome> {
-  // Try to ACTUALLY enable the firewall via socketfilterfw with admin
-  // privileges. macOS will pop a single password dialog — the user types
-  // their password once and the firewall turns on for real.
-  // Falls back to opening Settings if the privileged command fails.
+  // We gate the privileged osascript behind an Electron confirmation
+  // dialog so the user always sees an explanation BEFORE the macOS
+  // password prompt steals focus. Without this gate the system password
+  // dialog appears asynchronously the moment osascript runs and the
+  // panel's heads-up text never has a chance to render.
+  const dialog = tryGetDialog();
+  if (dialog) {
+    const confirm = await dialog.showMessageBox({
+      type: 'warning',
+      buttons: ['تفعيل (سيُطلب كلمة السر)', 'تخطّي'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'تفعيل جدار الحماية — NCA-ECC-2-T5-1',
+      message: 'يحتاج وكيل الأمان إلى تفعيل جدار الحماية',
+      detail:
+        'بعد الضغط على "تفعيل" سيظهر طلب كلمة سر المسؤول من macOS مرّة واحدة فقط لتشغيل جدار الحماية وفق ضابط NCA-ECC-2-T5-1.\n\nاضغطي "تخطّي" لفتح إعدادات الأمان يدوياً بدلاً من ذلك.',
+    });
+    if (confirm.response !== 0) {
+      // User chose to skip — open Settings so they can review manually.
+      try {
+        await execAsync('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
+        return {
+          id: 'firewall',
+          titleArabic: 'جدار الحماية',
+          result: 'opened_settings',
+          detailsArabic: 'تخطّيتِ التفعيل التلقائي — فتحت لكِ إعدادات جدار الحماية',
+        };
+      } catch {
+        return {
+          id: 'firewall',
+          titleArabic: 'جدار الحماية',
+          result: 'skipped',
+          detailsArabic: 'تخطّيتِ التفعيل التلقائي',
+        };
+      }
+    }
+  }
+
+  // User confirmed (or no Electron context — e.g. standalone test).
   try {
     await execAsync(
       `osascript -e 'do shell script "/usr/libexec/ApplicationFirewall/socketfilterfw --setglobalstate on" with administrator privileges with prompt "تفعيل جدار الحماية (NCA-ECC-2-T5-1)"'`,
@@ -66,15 +118,15 @@ async function openFirewallSettings(): Promise<FixOutcome> {
       detailsArabic: 'تم تفعيل جدار الحماية بنجاح',
     };
   } catch {
-    // Fallback: user cancelled or admin command unavailable — open the
-    // Settings pane so they can finish manually.
+    // osascript errored (user cancelled the password dialog, or admin
+    // command unavailable) — open the Settings pane as a fallback.
     try {
       await execAsync('open "x-apple.systempreferences:com.apple.preference.security?Firewall"');
       return {
         id: 'firewall',
         titleArabic: 'جدار الحماية',
         result: 'opened_settings',
-        detailsArabic: 'فتحت إعدادات جدار الحماية — اضغطي "تشغيل" لتفعيله',
+        detailsArabic: 'لم يتم التفعيل — فتحت لكِ الإعدادات لإكمالها يدوياً',
       };
     } catch {
       return {
@@ -182,9 +234,11 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
         firewall: {
           lines: [
             '🔧 الخطوة التالية: تفعيل جدار الحماية (NCA-ECC-2-T5-1)',
-            '⚠️ سيظهر طلب كلمة سر المسؤول — اكتبي كلمة السر واضغطي OK لتفعيله',
+            '⏳ سيظهر مربّع تأكيد — اضغطي "تفعيل" ثم أدخلي كلمة السر',
           ],
-          pause: 2500, // give user time to read before macOS dialog steals focus
+          // Short pause — the Electron confirmation dialog is the
+          // actual gate, so we don't need a long pre-pause here.
+          pause: 600,
         },
         os_updates: {
           lines: [
