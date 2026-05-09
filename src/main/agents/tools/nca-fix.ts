@@ -237,7 +237,12 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
 export type StepCallback = (text: string) => Promise<void> | void;
 
 const STEP_PAUSE_MS = 150; // human-readable pacing between updates
-const POST_OPEN_SETTINGS_MS = 2000; // extra pause after opening a Settings pane so user can read the instruction
+// When we open a Settings pane, the user has to actually click something
+// (toggle Firewall, click Update Now, etc). The panel must keep narrating
+// long enough for the user to read AND act, otherwise the panel goes
+// silent and they don't know what to do.
+const POST_OPEN_SETTINGS_MS = 8000;
+const POST_FIX_NARRATION_MS = 1200; // pause after a successful auto-fix
 
 async function pause(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
@@ -284,51 +289,59 @@ export async function runNcaAuditAndFix(
     await onStep(`🔧 المرحلة 2: معالجة ${issuesCount} مشكلة`);
     await pause(STEP_PAUSE_MS);
   }
-  for (const check of beforeReport.checks) {
-    if (check.status === 'pass') continue;
+  // Build a list of just the failing checks so we can announce
+  // "Step N of M" — much clearer than silent loop iteration.
+  const toFix = beforeReport.checks.filter((c) => c.status !== 'pass');
+
+  for (let i = 0; i < toFix.length; i++) {
+    const check = toFix[i];
     let outcome: FixOutcome;
+    const stepHeader = `الخطوة ${i + 1} من ${toFix.length}`;
 
     // Narrate what's about to happen so the user isn't surprised by
-    // password dialogs / window pop-ups. Some actions (firewall) trigger
-    // a blocking system dialog the moment we call them, so we use longer
-    // pauses on those to give the user time to read.
+    // password dialogs / window pop-ups. Multi-line, paced narration so
+    // the panel keeps speaking instead of going silent and the user
+    // always knows what's expected of them.
     if (onStep) {
-      const beforeMsg: Record<string, { lines: string[]; pause: number }> = {
+      const beforeMsg: Record<string, { lines: string[]; finalPause: number }> = {
         screen_lock: {
-          lines: ['🔧 الخطوة التالية: تفعيل قفل الشاشة الفوري'],
-          pause: STEP_PAUSE_MS,
+          lines: [
+            `🔧 ${stepHeader}: قفل الشاشة الفوري`,
+            'لا يحتاج تدخّلك — أفعّله تلقائياً عبر defaults write',
+          ],
+          finalPause: 600,
         },
         firewall: {
           lines: [
-            '🔧 الخطوة التالية: تفعيل جدار الحماية (NCA-ECC-2-T5-1)',
-            '⏳ سيظهر مربّع تأكيد — اضغطي "تفعيل" ثم أدخلي كلمة السر',
+            `🔧 ${stepHeader}: تفعيل جدار الحماية (NCA-ECC-2-T5-1)`,
+            'سأطلب صلاحية المسؤول لتفعيله — مرّة واحدة فقط',
+            '⏳ سيظهر مربّع تأكيد بعد ثوانٍ — اضغطي "تفعيل"',
           ],
-          // Short pause — the Electron confirmation dialog is the
-          // actual gate, so we don't need a long pre-pause here.
-          pause: 600,
+          finalPause: 800,
         },
         os_updates: {
           lines: [
-            '🔧 الخطوة التالية: فتح Software Update',
-            'سأفتح لكِ النافذة لتراجعي التحديثات المتوفرة وتثبّتيها',
+            `🔧 ${stepHeader}: تحديثات النظام`,
+            'سأفتح Software Update لكِ — انتظري قليلاً',
           ],
-          pause: 1500,
+          finalPause: 1200,
         },
         filevault: {
           lines: [
-            '⚠️ الخطوة التالية: مراجعة FileVault',
-            'لن يُفعَّل تلقائياً (خطر فقد البيانات إن لم تُحفظ مفاتيح الاسترجاع)',
+            `⚠️ ${stepHeader}: مراجعة FileVault`,
+            'لن يُفعَّل تلقائياً — خطر فقد البيانات إن لم تُحفظ مفاتيح الاسترجاع',
+            'سأفتح الإعدادات للمراجعة فقط',
           ],
-          pause: 1500,
+          finalPause: 1200,
         },
       };
       const msg = beforeMsg[check.id];
       if (msg) {
         for (const line of msg.lines) {
           await onStep(line);
-          await pause(STEP_PAUSE_MS);
+          await pause(700); // slow enough to actually read
         }
-        await pause(msg.pause);
+        await pause(msg.finalPause);
       }
     }
 
@@ -368,22 +381,80 @@ export async function runNcaAuditAndFix(
     }
     fixes.push(outcome);
 
-    // Narrate the result. When we open a Settings pane the user actually
-    // needs time to look at it, so use a longer pause for that case so
-    // the instruction text doesn't get overwritten by the next step.
+    // Narrate the result on the agent panel. For instant fixes show
+    // the success line briefly. For opened_settings, ROTATE through a
+    // sequence of nudges so the panel keeps talking while the user
+    // actually performs the click — the panel never goes silent and
+    // the instructions stay on screen for the full POST_OPEN_SETTINGS_MS.
+    const isLastFix = i === toFix.length - 1;
     if (onStep) {
-      const icon = outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
-      await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
-      await pause(outcome.result === 'opened_settings' ? POST_OPEN_SETTINGS_MS : STEP_PAUSE_MS);
+      const icon =
+        outcome.result === 'fixed' ? '✅' :
+        outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
+
+      if (outcome.result === 'fixed') {
+        await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
+        await pause(POST_FIX_NARRATION_MS);
+        if (!isLastFix) {
+          await onStep(`✓ تم. ننتقل للخطوة التالية...`);
+          await pause(700);
+        }
+      } else if (outcome.result === 'opened_settings') {
+        // Cycle through several nudge messages so the panel doesn't go
+        // silent while the user is acting in System Settings. Total time
+        // is POST_OPEN_SETTINGS_MS (8 s).
+        const nudges: Record<string, string[]> = {
+          firewall: [
+            `${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`,
+            '👉 اضغطي على زر Firewall toggle لتفعيله',
+            '⏳ بانتظارك... خذي وقتك في تفعيل جدار الحماية',
+            'سيتغيّر اللون إلى أخضر = مفعَّل ✓',
+          ],
+          os_updates: [
+            `${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`,
+            '👉 اضغطي "Update Now" أو "More info..." لرؤية التحديثات',
+            '⏳ بانتظارك... راجعي التحديثات وابدئي التثبيت',
+            'يمكنك إكمال التثبيت لاحقاً — سأنتقل لو وافقتِ',
+          ],
+          filevault: [
+            `${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`,
+            '⚠️ FileVault خطير — لا تفعّليه قبل حفظ مفتاح الاسترجاع',
+            '👉 راجعي الإعدادات فقط لهذه الخطوة',
+            'هذه خطوة اختيارية تتطلب قرارك',
+          ],
+        };
+        const seq = nudges[check.id] ?? [`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`];
+        const stepInterval = Math.max(800, Math.floor(POST_OPEN_SETTINGS_MS / seq.length));
+        for (const nudge of seq) {
+          await onStep(nudge);
+          await pause(stepInterval);
+        }
+        if (!isLastFix) {
+          await onStep('✓ تم. ننتقل للخطوة التالية...');
+          await pause(700);
+        }
+      } else {
+        // skipped
+        await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
+        await pause(POST_FIX_NARRATION_MS);
+      }
     }
 
-    // Conversational outcome line for the chat — same content the user
-    // sees in the panel but rendered as a normal sentence so the chat
-    // reads like a real assistant.
+    // Conversational outcome line for the chat. For "fixed" we add a
+    // chatty bridge to the next step. For "opened_settings" we say what
+    // the user should be doing in their newly-opened window.
     if (onSay) {
       const icon =
-        outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
-      onSay(`  ${icon} ${outcome.detailsArabic}\n\n`);
+        outcome.result === 'fixed' ? '✅' :
+        outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
+      onSay(`  ${icon} ${outcome.detailsArabic}\n`);
+      if (outcome.result === 'fixed' && !isLastFix) {
+        onSay(`  ▸ ممتاز! ننتقل الآن للخطوة التالية...\n\n`);
+      } else if (outcome.result === 'opened_settings' && !isLastFix) {
+        onSay(`  ▸ خذي وقتك في إنجاز هذه الخطوة، ثم سأنتقل للتالية...\n\n`);
+      } else {
+        onSay('\n');
+      }
     }
   }
 
