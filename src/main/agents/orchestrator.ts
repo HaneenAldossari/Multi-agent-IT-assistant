@@ -26,6 +26,11 @@ export interface OrchestratorInput {
   anthropicKey: string;
   signal: AbortSignal;
   onAgentMessage: (msg: AgentMessage) => void;
+  /** Conversational chunks streamed into the IT Assistant chat bubble.
+   * Lets the orchestrator say "حسناً، فهمت..." up front and narrate
+   * progress in plain Arabic, instead of the chat sitting empty for
+   * 30 seconds and then showing only a summary block. */
+  onAssistantChunk?: (chunk: string) => void;
 }
 
 function emit(
@@ -47,6 +52,11 @@ export async function handleUserRequest(
   input: OrchestratorInput,
 ): Promise<OrchestratorOutput | null> {
   const { voiceTranscript, screenshot, anthropicKey, signal, onAgentMessage } = input;
+  const onAssistantChunk = input.onAssistantChunk ?? (() => undefined);
+  const sayChunk = (text: string): void => {
+    if (signal.aborted) return;
+    onAssistantChunk(text);
+  };
 
   // ── Resolver-only fast path ──────────────────────────────────────────
   if (RESOLVER_ONLY_MODE) {
@@ -75,6 +85,9 @@ export async function handleUserRequest(
   }
 
   // ── 1. Memory (real Claude Agent SDK call) ────────────────────────────
+  // Greet the user immediately so the chat doesn't sit empty for 10+ s
+  // while Memory's Claude API call runs.
+  sayChunk(`حسناً، فهمتُ طلبك — لحظة، أراجع السياق.\n\n`);
   emit(onAgentMessage, 'memory', 'thinking', `📝 سمعت: "${voiceTranscript.slice(0, 80)}"`);
   await new Promise((r) => setTimeout(r, 600)); // brief readable pause
   emit(onAgentMessage, 'memory', 'thinking', '🔍 يبحث في سجل البلاغات السابقة...');
@@ -96,6 +109,20 @@ export async function handleUserRequest(
           : `📋 ${memory.summaryArabic}`;
   emit(onAgentMessage, 'memory', 'active', planText);
   console.log(`[orchestrator] Memory: path=${memory.recommendedPath} confidence=${memory.confidence}`);
+
+  // Conversational explanation so the user sees a plan in the chat,
+  // not just in the (small) agents panel. Tailored per recommended path.
+  if (memory.recommendedPath === 'scripted') {
+    if (memory.scriptedTool === 'ncaAuditAndFix' || memory.scriptedTool === 'ncaAudit') {
+      sayChunk(
+        `سأفحص توافق جهازك مع ضوابط NCA-ECC الأساسية (5 ضوابط: قفل الشاشة، جدار الحماية، التحديثات، التشفير، كلمة السر) وأصلح ما يمكن تلقائياً.\n\n`,
+      );
+    } else {
+      sayChunk(`سأنفّذ الخطوة المطلوبة الآن.\n\n`);
+    }
+  } else if (memory.recommendedPath === 'computer_use') {
+    sayChunk(`سأشتغل على جهازك مباشرة لإنجاز هذه المهمة. لا تحرّكي المؤشر أثناء عملي.\n\n`);
+  }
 
   // If Memory recommends escalation (e.g. password reset, install software,
   // hardware), don't even start Resolver — go straight to ticket creation.
@@ -264,6 +291,7 @@ export async function handleUserRequest(
       memory.scriptedTool,
       memory.scriptedArgs ?? {},
       (stepText) => emit(onAgentMessage, 'resolver', 'thinking', stepText),
+      sayChunk,
     );
     if (scripted) {
       console.log(`[orchestrator] Scripted: tool=${memory.scriptedTool} ok=${scripted.ok} script="${scripted.script}"`);

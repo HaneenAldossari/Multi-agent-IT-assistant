@@ -195,7 +195,12 @@ async function pause(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAndFixReport> {
+export type SayCallback = (chunk: string) => void;
+
+export async function runNcaAuditAndFix(
+  onStep?: StepCallback,
+  onSay?: SayCallback,
+): Promise<AuditAndFixReport> {
   // Phase 1: audit (announce each check as it runs)
   if (onStep) {
     await onStep('🔍 المرحلة 1: فحص الأمان (5 ضوابط NCA-ECC)');
@@ -215,6 +220,18 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
   // Phase 2: apply remediations
   const fixes: FixOutcome[] = [];
   const issuesCount = beforeReport.failCount + beforeReport.warnCount;
+
+  // Conversational summary of what we found, before we start fixing.
+  if (onSay) {
+    if (issuesCount === 0) {
+      onSay(`الفحص اكتمل: ${beforeReport.passCount}/${beforeReport.totalChecks} ✅ — جهازك مطابق بالكامل.\n\n`);
+    } else {
+      onSay(
+        `انتهيتُ من الفحص: ${beforeReport.passCount}/${beforeReport.totalChecks}. وجدتُ ${issuesCount} ${issuesCount === 1 ? 'مشكلة' : 'مشاكل'} — سأبدأ المعالجة:\n\n`,
+      );
+    }
+  }
+
   if (onStep && issuesCount > 0) {
     await onStep(`🔧 المرحلة 2: معالجة ${issuesCount} مشكلة`);
     await pause(STEP_PAUSE_MS);
@@ -267,6 +284,20 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
       }
     }
 
+    // Conversational announcement of which fix is starting — appears in
+    // the IT Assistant chat alongside the technical narration in the
+    // agents panel.
+    if (onSay) {
+      const sayBefore: Record<string, string> = {
+        screen_lock: `• قفل الشاشة الفوري — أفعّله الآن.\n`,
+        firewall: `• جدار الحماية — سيظهر مربّع تأكيد ثم طلب كلمة سر المسؤول.\n`,
+        os_updates: `• تحديثات النظام — سأفتح Software Update لكِ.\n`,
+        filevault: `• تشفير القرص (FileVault) — سأفتح الإعدادات للمراجعة فقط (لن يُفعَّل تلقائياً).\n`,
+      };
+      const text = sayBefore[check.id];
+      if (text) onSay(text);
+    }
+
     switch (check.id) {
       case 'screen_lock':
         outcome = await fixScreenLock();
@@ -292,6 +323,15 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
       const icon = outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
       await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
       await pause(outcome.result === 'opened_settings' ? POST_OPEN_SETTINGS_MS : STEP_PAUSE_MS);
+    }
+
+    // Conversational outcome line for the chat — same content the user
+    // sees in the panel but rendered as a normal sentence so the chat
+    // reads like a real assistant.
+    if (onSay) {
+      const icon =
+        outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
+      onSay(`  ${icon} ${outcome.detailsArabic}\n\n`);
     }
   }
 

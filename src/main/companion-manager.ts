@@ -781,6 +781,10 @@ export class CompanionManager {
       // semantics Flicky uses for its single-call path. Each agent emits
       // onAgentMessage events that drive the visual panel.
       console.log('[Multi-Agent] orchestrator: dispatching 4-agent pipeline');
+      // Accumulate streamed chunks so onComplete (which REPLACES the
+      // bubble text) can fire with the full conversational transcript
+      // instead of clobbering everything with just the final summary.
+      let streamedSoFar = '';
       const output = await handleUserRequest({
         voiceTranscript: result.text,
         screenshot: visionScreenshot,
@@ -789,6 +793,11 @@ export class CompanionManager {
         onAgentMessage: (msg) => {
           if (!isCurrent()) return;
           this.callbacks.onAgentMessage(msg);
+        },
+        onAssistantChunk: (chunk) => {
+          if (!isCurrent()) return;
+          streamedSoFar += chunk;
+          mindCallbacks.onChunk(chunk);
         },
       });
 
@@ -802,8 +811,19 @@ export class CompanionManager {
         await mindCallbacks.onComplete(fallbackMessage);
         console.log('[Multi-Agent] orchestrator: returned null, emitted fallback message');
       } else {
-        mindCallbacks.onChunk(output.finalUserMessage);
-        await mindCallbacks.onComplete(output.finalUserMessage);
+        // If chunks already streamed in, the bubble already contains them.
+        // Avoid re-appending; just replace with the canonical full text
+        // (streamedSoFar + finalUserMessage) on completion. If nothing
+        // streamed, fall back to the legacy single-message path.
+        const fullText = streamedSoFar
+          ? `${streamedSoFar}${output.finalUserMessage}`
+          : output.finalUserMessage;
+        if (!streamedSoFar) {
+          mindCallbacks.onChunk(output.finalUserMessage);
+        } else {
+          mindCallbacks.onChunk(output.finalUserMessage);
+        }
+        await mindCallbacks.onComplete(fullText);
         if (output.cursorTarget && isCurrent()) {
           console.log(
             `[Multi-Agent] orchestrator: firing cursor at ${output.cursorTarget.x},${output.cursorTarget.y}`,

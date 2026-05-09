@@ -120,8 +120,20 @@ export interface MemoryResult {
   confidence: number;
   /** One-sentence Arabic summary suitable for the agent panel */
   summaryArabic: string;
-  /** Only set when recommendedPath="scripted". Names the tool to call. */
-  scriptedTool?: 'openApp' | 'quitApp' | 'restartApp' | 'switchWifi';
+  /** Only set when recommendedPath="scripted". Names the tool to call.
+   * The dispatcher (tools/scripted.ts) is the source of truth for which
+   * tools are valid; this string is validated there. */
+  scriptedTool?:
+    | 'openApp'
+    | 'quitApp'
+    | 'restartApp'
+    | 'switchWifi'
+    | 'ncaAudit'
+    | 'ncaAuditAndFix'
+    | 'brightnessUp'
+    | 'brightnessDown'
+    | 'volumeUp'
+    | 'mute';
   /** Args for the scripted tool. Free-form key/value pairs. */
   scriptedArgs?: Record<string, string>;
   /** Backwards-compat: legacy callers expect `matches` and `summaryArabic` */

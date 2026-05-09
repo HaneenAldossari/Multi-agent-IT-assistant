@@ -107,9 +107,12 @@ export async function ncaAudit(): Promise<ScriptedResult> {
 }
 
 /** Run NCA audit and auto-remediate failures where safe. */
-export async function ncaAuditAndFix(onStep?: (text: string) => Promise<void> | void): Promise<ScriptedResult> {
+export async function ncaAuditAndFix(
+  onStep?: (text: string) => Promise<void> | void,
+  onSay?: (chunk: string) => void,
+): Promise<ScriptedResult> {
   try {
-    const result = await runNcaAuditAndFix(onStep);
+    const result = await runNcaAuditAndFix(onStep, onSay);
     return {
       ok: result.afterReport.passCount > result.beforeReport.passCount,
       message: result.summaryArabic,
@@ -127,11 +130,14 @@ export async function ncaAuditAndFix(onStep?: (text: string) => Promise<void> | 
 /** Dispatch by tool name. Returns null if unknown tool.
  * The optional onStep callback lets long-running tools (like NCA audit-
  * and-fix) emit per-step updates so the agent panel stays alive and
- * narrates the work instead of going dark for several seconds. */
+ * narrates the work instead of going dark for several seconds.
+ * The optional onSay callback streams conversational chunks into the
+ * IT Assistant chat (separate from the technical step narration). */
 export async function dispatchScripted(
   tool: string,
   args: Record<string, string>,
   onStep?: (text: string) => Promise<void> | void,
+  onSay?: (chunk: string) => void,
 ): Promise<ScriptedResult | null> {
   switch (tool) {
     case 'openApp':
@@ -153,7 +159,7 @@ export async function dispatchScripted(
     case 'ncaAuditAndFix':
     case 'nca_audit_fix':
     case 'fixCompliance':
-      return ncaAuditAndFix(onStep);
+      return ncaAuditAndFix(onStep, onSay);
     default:
       return null;
   }
