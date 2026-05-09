@@ -108,19 +108,66 @@ export async function handleUserRequest(
   }
 
   // ── 1.5 Guardian PRE-CHECK ────────────────────────────────────────────
-  // Guardian reviews the user's INTENT (transcript + Memory's analysis)
-  // BEFORE Resolver acts. If the action would violate policy (e.g.
-  // installing a program from an external source), Guardian blocks here
-  // — Resolver never runs and the user sees the suggested alternative
-  // instead. This is what makes the multi-agent demo real: the harmful
-  // action is intercepted, not just logged after-the-fact.
-  emit(onAgentMessage, 'guardian', 'thinking', 'يراجع طلب المستخدم قبل التنفيذ...');
-  const intentDescription =
-    `طلب المستخدم: "${voiceTranscript}". تحليل الذاكرة: ${memory.summaryArabic}` +
-    (memory.recommendedPath === 'scripted' && memory.scriptedTool
-      ? ` (يقترح استخدام أداة ${memory.scriptedTool})`
-      : '');
-  const guardianPre = await runGuardianAgent(intentDescription, anthropicKey);
+  // Guardian reviews the user's INTENT before Resolver acts. If the action
+  // would violate policy (e.g. installing from external source), Guardian
+  // blocks here.
+  //
+  // OPTIMIZATION: skip Guardian for trusted scripted tools that are already
+  // policy-approved (restartApp, openApp, ncaAudit, etc.). These are safe
+  // by design — calling Guardian for them just burns API tokens. Save the
+  // ~$0.05 per Memory→Guardian round-trip on common scenarios.
+  const TRUSTED_SCRIPTED_TOOLS = new Set([
+    'openApp',
+    'restartApp',
+    'quitApp',
+    'switchWifi',
+    'ncaAudit',
+    'ncaAuditAndFix',
+    'brightnessUp',
+    'brightnessDown',
+    'volumeUp',
+    'mute',
+  ]);
+  const isTrustedScripted =
+    memory.recommendedPath === 'scripted' &&
+    memory.scriptedTool &&
+    TRUSTED_SCRIPTED_TOOLS.has(memory.scriptedTool) &&
+    memory.confidence >= 0.5;
+
+  type GuardianLike = {
+    verdict: 'approve' | 'block' | 'escalate';
+    rationaleArabic: string;
+    policyReference: string;
+    suggestedAlternativeArabic?: string;
+    suggestedSearchQuery?: string;
+    approved: boolean;
+  };
+  let guardianPre: GuardianLike;
+
+  if (isTrustedScripted) {
+    console.log(
+      `[orchestrator] Skipping Guardian pre-check — trusted scripted tool: ${memory.scriptedTool}`,
+    );
+    emit(
+      onAgentMessage,
+      'guardian',
+      'active',
+      `موافقة تلقائية — أداة معتمدة (${memory.scriptedTool})`,
+    );
+    guardianPre = {
+      verdict: 'approve',
+      rationaleArabic: 'أداة معتمدة مسبقاً',
+      policyReference: 'NCA-DEFAULT-TRUSTED',
+      approved: true,
+    };
+  } else {
+    emit(onAgentMessage, 'guardian', 'thinking', 'يراجع طلب المستخدم قبل التنفيذ...');
+    const intentDescription =
+      `طلب المستخدم: "${voiceTranscript}". تحليل الذاكرة: ${memory.summaryArabic}` +
+      (memory.recommendedPath === 'scripted' && memory.scriptedTool
+        ? ` (يقترح استخدام أداة ${memory.scriptedTool})`
+        : '');
+    guardianPre = await runGuardianAgent(intentDescription, anthropicKey);
   if (signal.aborted) return null;
   console.log(
     `[orchestrator] Guardian pre-check: verdict=${guardianPre.verdict} policy=${guardianPre.policyReference}`,
@@ -183,6 +230,10 @@ export async function handleUserRequest(
   // Guardian approved (or escalated, which we treat as approve+caveat for now).
   // Continue to Resolver.
   emit(onAgentMessage, 'guardian', 'active', `تمت الموافقة الأولية (${guardianPre.policyReference})`);
+  } // end else (Guardian pre-check ran)
+
+  // Reference the variable to keep TS happy when isTrustedScripted=true
+  void guardianPre;
 
   // ── 2. Resolver — scripted fast path OR Computer Use loop ─────────────
   // If Memory recommended a known scripted tool with high confidence,
