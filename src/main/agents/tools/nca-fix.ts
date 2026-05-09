@@ -134,7 +134,7 @@ async function openFirewallSettings(): Promise<FixOutcome> {
           titleArabic: 'جدار الحماية',
           result: 'opened_settings',
           detailsArabic:
-            'تخطّيتِ التفعيل التلقائي — انتقلت بكِ إلى قسم Firewall، فعّلي زر التشغيل',
+            '👉 اتبعي الخطوات:\n   1) في System Settings → Network → Firewall\n   2) اضغطي على زر "Firewall" (toggle) لتفعيله\n   3) سيتغيّر اللون إلى أخضر = مفعَّل ✓',
         };
       } catch {
         return {
@@ -168,7 +168,7 @@ async function openFirewallSettings(): Promise<FixOutcome> {
         titleArabic: 'جدار الحماية',
         result: 'opened_settings',
         detailsArabic:
-          'لم يتم التفعيل التلقائي — انتقلت بكِ إلى قسم Firewall، فعّلي زر التشغيل',
+          '👉 اتبعي الخطوات:\n   1) في System Settings → Network → Firewall\n   2) اضغطي على زر "Firewall" (toggle) لتفعيله\n   3) سيتغيّر اللون إلى أخضر = مفعَّل ✓',
       };
     } catch {
       return {
@@ -193,7 +193,7 @@ async function openSoftwareUpdate(): Promise<FixOutcome> {
       titleArabic: 'تحديثات النظام',
       result: 'opened_settings',
       detailsArabic:
-        'افتحت Software Update — إذا ظهر "Update Now" اضغطيه، أو اضغطي "More info" ثم اختاري التحديثات وثبّتيها',
+        '👉 اتبعي الخطوات:\n   1) إذا ظهر زر "Update Now" → اضغطيه\n   2) أو اضغطي "More info..." → اختاري التحديثات → "Install Now"\n   3) أعيدي تشغيل الجهاز عند الطلب',
     };
   } catch {
     return {
@@ -215,7 +215,7 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
       titleArabic: 'تشفير القرص (FileVault)',
       result: 'opened_settings',
       detailsArabic:
-        'افتحت إعدادات FileVault — انزلي إلى قسم "Security" واضغطي "FileVault" للمراجعة. لا تضغطي "Turn On" قبل حفظ مفتاح الاسترجاع في مكان آمن.',
+        '👉 اتبعي الخطوات:\n   1) انزلي إلى قسم "Security"\n   2) اضغطي "FileVault" → "Turn On..."\n   3) ⚠️ احفظي مفتاح الاسترجاع (Recovery Key) في مكان آمن قبل التأكيد',
     };
   } catch {
     return {
@@ -339,12 +339,12 @@ export async function runNcaAuditAndFix(
     // without context.
     if (onSay) {
       const sayBefore: Record<string, string> = {
-        screen_lock: `• قفل الشاشة الفوري — أفعّله الآن (لا يحتاج تدخّلك).\n`,
-        firewall: `• جدار الحماية — سيظهر مربّع تأكيد، ثم طلب كلمة سر المسؤول لتفعيله تلقائياً (NCA-ECC-2-T5-1).\n`,
+        screen_lock: `🔧 **قفل الشاشة الفوري** — أفعّله الآن تلقائياً (لا تدخّل منكِ).\n`,
+        firewall: `🔧 **جدار الحماية (NCA-ECC-2-T5-1)** — سيظهر مربّع تأكيد، اضغطي "تفعيل" ثم أدخلي كلمة السر مرّة واحدة.\n`,
         os_updates:
-          `• تحديثات النظام — سأفتح System Settings → General → Software Update. ابحثي عن زر "Update Now" أو "More info" وثبّتي التحديثات المتوفّرة.\n`,
+          `🔧 **تحديثات النظام** — سأفتح Software Update.\n  ▸ خطوة 1: اضغطي "Update Now" إذا ظهر\n  ▸ خطوة 2: أو "More info..." → اختاري التحديثات → "Install Now"\n`,
         filevault:
-          `• تشفير القرص (FileVault) — سأفتح Privacy & Security. لا تفعّلي FileVault قبل أن تحفظي مفتاح الاسترجاع في مكان آمن (خطر فقد البيانات).\n`,
+          `🔧 **تشفير القرص (FileVault)** — سأفتح Privacy & Security.\n  ⚠️ احفظي مفتاح الاسترجاع قبل التفعيل (خطر فقد البيانات).\n  ▸ خطوة 1: انزلي إلى قسم Security\n  ▸ خطوة 2: اضغطي FileVault → Turn On\n`,
       };
       const text = sayBefore[check.id];
       if (text) onSay(text);
