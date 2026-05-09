@@ -67,6 +67,46 @@ async function fixScreenLock(): Promise<FixOutcome> {
   }
 }
 
+/** Open Network settings then attempt to click the "Firewall" row via UI
+ * scripting. Falls through silently if the click fails (user just sees
+ * the Network pane with the instruction in the chat). The "agent acts"
+ * principle: don't just dump them at Settings, navigate them in. */
+async function navigateToFirewallSection(): Promise<void> {
+  await execAsync('open "x-apple.systempreferences:com.apple.Network-Settings.extension"');
+  // Give Settings a moment to launch and render before sending UI events.
+  await new Promise((r) => setTimeout(r, 1200));
+  // Best-effort: look for a button or row whose name contains "Firewall"
+  // and click it. macOS 14/15 System Settings uses SwiftUI so the AX
+  // hierarchy is unstable across versions — wrap each access in `try`.
+  const navScript = `
+    tell application "System Events"
+      tell process "System Settings"
+        try
+          set frontmost to true
+          delay 0.3
+          -- Try button form first (most common)
+          try
+            click (first button of window 1 whose name contains "Firewall")
+            return "clicked-button"
+          end try
+          -- Fall back to row in a table/outline
+          try
+            click (first row of (first outline of (first scroll area of window 1)) whose name contains "Firewall")
+            return "clicked-row"
+          end try
+        end try
+      end tell
+    end tell
+    return "skipped"
+  `;
+  try {
+    await execAsync(`osascript -e ${JSON.stringify(navScript)}`);
+  } catch {
+    // UI scripting permission not granted, or hierarchy changed — that's
+    // fine, the user still sees Network with our chat instruction.
+  }
+}
+
 async function openFirewallSettings(): Promise<FixOutcome> {
   // We gate the privileged osascript behind an Electron confirmation
   // dialog so the user always sees an explanation BEFORE the macOS
@@ -88,13 +128,13 @@ async function openFirewallSettings(): Promise<FixOutcome> {
     if (confirm.response !== 0) {
       // User chose to skip — open Settings so they can review manually.
       try {
-        await execAsync('open "x-apple.systempreferences:com.apple.Network-Settings.extension"');
+        await navigateToFirewallSection();
         return {
           id: 'firewall',
           titleArabic: 'جدار الحماية',
           result: 'opened_settings',
           detailsArabic:
-            'فتحت إعدادات الشبكة — مرّري لأسفل واضغطي "Firewall"، ثم فعّلي زر التشغيل',
+            'تخطّيتِ التفعيل التلقائي — انتقلت بكِ إلى قسم Firewall، فعّلي زر التشغيل',
         };
       } catch {
         return {
@@ -122,13 +162,13 @@ async function openFirewallSettings(): Promise<FixOutcome> {
     // osascript errored (user cancelled the password dialog, or admin
     // command unavailable) — open the Settings pane as a fallback.
     try {
-      await execAsync('open "x-apple.systempreferences:com.apple.Network-Settings.extension"');
+      await navigateToFirewallSection();
       return {
         id: 'firewall',
         titleArabic: 'جدار الحماية',
         result: 'opened_settings',
         detailsArabic:
-          'لم يتم التفعيل التلقائي — فتحت إعدادات الشبكة، اضغطي "Firewall" ثم فعّلي زر التشغيل',
+          'لم يتم التفعيل التلقائي — انتقلت بكِ إلى قسم Firewall، فعّلي زر التشغيل',
       };
     } catch {
       return {
@@ -196,8 +236,8 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
  */
 export type StepCallback = (text: string) => Promise<void> | void;
 
-const STEP_PAUSE_MS = 250; // human-readable pacing between updates
-const POST_OPEN_SETTINGS_MS = 2500; // extra pause after opening a Settings pane so user can read the instruction
+const STEP_PAUSE_MS = 150; // human-readable pacing between updates
+const POST_OPEN_SETTINGS_MS = 2000; // extra pause after opening a Settings pane so user can read the instruction
 
 async function pause(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));

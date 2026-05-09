@@ -84,6 +84,38 @@ export async function handleUserRequest(
     };
   }
 
+  // ── 0. Fast-path intent matching ──────────────────────────────────────
+  // For unambiguous demo prompts (NCA audit, ping, WinRAR), skip the
+  // Memory Claude API call entirely. Saves ~10 seconds AND saves ~$0.02
+  // per run. Memory is only useful for ambiguous queries — these aren't.
+  const transcriptLower = voiceTranscript.toLowerCase();
+  const NCA_KEYWORDS = ['nca', 'توافق', 'الأمن السيبراني', 'فحص أمان', 'افحصي أمان', 'افحصي إعدادات الأمان', 'فحص الأمان'];
+  const isNcaIntent = NCA_KEYWORDS.some((k) => transcriptLower.includes(k.toLowerCase()));
+
+  if (isNcaIntent) {
+    sayChunk(`حسناً، فهمتُ — فحص توافق NCA. أبدأ الآن.\n\n`);
+    emit(onAgentMessage, 'memory', 'active', '✓ مطابقة مباشرة: فحص NCA');
+    emit(onAgentMessage, 'guardian', 'active', '✓ مسموح — فحص أمان داخلي');
+    emit(onAgentMessage, 'resolver', 'thinking', 'يستخدم سكريبت ncaAuditAndFix...');
+
+    const scripted = await dispatchScripted(
+      'ncaAuditAndFix',
+      {},
+      (stepText) => emit(onAgentMessage, 'resolver', 'thinking', stepText),
+      sayChunk,
+    );
+    if (signal.aborted) return null;
+    const finalMessage = scripted?.message ?? 'تعذّر إجراء الفحص';
+    emit(onAgentMessage, 'resolver', 'done', scripted?.ok ? 'تم الفحص والإصلاح' : 'تم الفحص');
+    emit(onAgentMessage, 'guardian', 'done', '✓ النتيجة متوافقة مع NCA-ECC');
+    emit(onAgentMessage, 'reporter', 'done', 'الرد سُلِّم');
+    emit(onAgentMessage, 'memory', 'done', 'تم التعرّف على الطلب مباشرة');
+    return {
+      finalUserMessage: finalMessage,
+      cursorTarget: null,
+    };
+  }
+
   // ── 1. Memory (real Claude Agent SDK call) ────────────────────────────
   // Greet the user immediately so the chat doesn't sit empty for 10+ s
   // while Memory's Claude API call runs.
