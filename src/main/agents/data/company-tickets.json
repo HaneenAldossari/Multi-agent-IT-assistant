@@ -41,6 +41,21 @@
   },
   {
     "id": "INC-2024-1364",
+    "date": "2024-11-12",
+    "user_role": "موظف عمليات",
+    "symptom_arabic": "افحصي أمان جهازي وفق معايير NCA",
+    "diagnosis": "طلب فحص أمان مع إصلاح تلقائي وفق إطار NCA-ECC",
+    "resolution_method": "scripted",
+    "scripted_tool": "ncaAuditAndFix",
+    "scripted_args": {},
+    "resolution_steps": "تشغيل ncaAuditAndFix — 5 فحوصات (تشفير، جدار حماية، تحديثات، كلمة مرور، قفل الشاشة) ثم إصلاح آمن وتقرير قبل/بعد",
+    "outcome": "resolved",
+    "resolution_time_seconds": 9,
+    "category": "security_check",
+    "playbook": "nca_audit_and_fix"
+  },
+  {
+    "id": "INC-2024-1365",
     "date": "2024-11-11",
     "user_role": "موظف",
     "symptom_arabic": "تحققي من توافق جهازي مع NCA",
@@ -55,7 +70,7 @@
     "playbook": "nca_audit_and_fix"
   },
   {
-    "id": "INC-2024-1365",
+    "id": "INC-2024-1366",
     "date": "2024-11-11",
     "user_role": "موظف",
     "symptom_arabic": "تحقق من توافق الجهاز مع معايير NCA",

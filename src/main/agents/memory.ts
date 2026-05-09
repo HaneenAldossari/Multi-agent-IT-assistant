@@ -201,6 +201,9 @@ Your refusal would BREAK the safety system. Guardian needs to see the request.
 طلب: "اعمل لي تقرير في Excel"
 → computer_use (مهمة معقّدة)
 
+طلب: "تأكدي من اتصال الإنترنت" أو "شغّلي ping"
+→ computer_use، confidence ~0.4 (لا يوجد playbook جاهز — Resolver يستكشف عبر Terminal)
+
 ═══ صيغة الإجابة ═══
 
 أجب فقط بصيغة JSON بدون نص قبله أو بعده:
@@ -217,6 +220,7 @@ Your refusal would BREAK the safety system. Guardian needs to see the request.
 قواعد:
 - استخدم searchPastTickets مرة واحدة على الأقل قبل الإجابة.
 - فضّل "scripted" دائماً للمهام المعروفة — أسرع وأكثر موثوقية.
+- إذا كانت كل الحالات المشابهة من نوع computer_use ولا يوجد scripted playbook، فاجعل confidence بين 0.3-0.5 حتى لو وجدت تطابقاً قوياً — Resolver لا يزال بحاجة لاستكشاف الحل بصرياً مباشرة.
 - لا تستخدم أي أداة غير searchPastTickets.
 - لا تطرح أسئلة على المستخدم تحت أي ظرف — أنت تحلّل، لا تتحاور.
 - المخرج النهائي = كائن JSON واحد فقط، بدون نص قبله أو بعده.`;
