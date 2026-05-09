@@ -135,7 +135,7 @@ async function openFileVaultSettings(): Promise<FixOutcome> {
  */
 export type StepCallback = (text: string) => Promise<void> | void;
 
-const STEP_PAUSE_MS = 700; // human-readable pacing between updates
+const STEP_PAUSE_MS = 500; // human-readable pacing between updates
 
 async function pause(ms: number): Promise<void> {
   await new Promise((r) => setTimeout(r, ms));
@@ -144,7 +144,7 @@ async function pause(ms: number): Promise<void> {
 export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAndFixReport> {
   // Phase 1: audit (announce each check as it runs)
   if (onStep) {
-    await onStep('بدء فحص الأمان وفق معايير NCA...');
+    await onStep('🔍 المرحلة 1: فحص الأمان (5 ضوابط NCA-ECC)');
     await pause(STEP_PAUSE_MS);
   }
   const beforeReport = await runNcaAudit();
@@ -154,19 +154,37 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
       await onStep(`${icon} ${c.titleArabic} (${c.ncaRef})`);
       await pause(STEP_PAUSE_MS);
     }
-    await onStep(`النتيجة قبل الإصلاح: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
+    await onStep(`📊 النتيجة الأولية: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
     await pause(STEP_PAUSE_MS);
   }
 
   // Phase 2: apply remediations
   const fixes: FixOutcome[] = [];
-  if (onStep && beforeReport.failCount + beforeReport.warnCount > 0) {
-    await onStep('بدء الإصلاح التلقائي للعناصر الآمنة...');
+  const issuesCount = beforeReport.failCount + beforeReport.warnCount;
+  if (onStep && issuesCount > 0) {
+    await onStep(`🔧 المرحلة 2: معالجة ${issuesCount} مشكلة`);
     await pause(STEP_PAUSE_MS);
   }
   for (const check of beforeReport.checks) {
     if (check.status === 'pass') continue;
     let outcome: FixOutcome;
+
+    // Narrate what's about to happen so the user isn't surprised by
+    // password dialogs / window pop-ups.
+    if (onStep) {
+      const beforeMsg: Record<string, string> = {
+        screen_lock: '🔧 يفعّل قفل الشاشة الفوري...',
+        firewall: '🔧 سيظهر طلب كلمة سر المسؤول لتفعيل جدار الحماية...',
+        os_updates: '🔧 يفتح Software Update لمراجعة التحديثات المتوفرة...',
+        filevault: '⚠️ سيفتح إعدادات FileVault — لن يُفعَّل تلقائياً (خطر فقد البيانات)...',
+      };
+      const msg = beforeMsg[check.id];
+      if (msg) {
+        await onStep(msg);
+        await pause(STEP_PAUSE_MS);
+      }
+    }
+
     switch (check.id) {
       case 'screen_lock':
         outcome = await fixScreenLock();
@@ -184,6 +202,8 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
         continue;
     }
     fixes.push(outcome);
+
+    // Narrate the result.
     if (onStep) {
       const icon = outcome.result === 'fixed' ? '✅' : outcome.result === 'opened_settings' ? '⚙️' : '⚠️';
       await onStep(`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`);
@@ -196,10 +216,14 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
 
   // Phase 3: re-audit
   if (onStep) {
-    await onStep('إعادة الفحص للتحقق من النتائج...');
+    await onStep('🔁 المرحلة 3: إعادة الفحص للتحقق');
     await pause(STEP_PAUSE_MS);
   }
   const afterReport = await runNcaAudit();
+  if (onStep) {
+    await onStep(`📊 النتيجة النهائية: ${afterReport.passCount}/${afterReport.totalChecks}`);
+    await pause(STEP_PAUSE_MS);
+  }
 
   // Build a bilingual summary of what changed
   const lines: string[] = [];
