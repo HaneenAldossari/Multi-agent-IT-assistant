@@ -6,6 +6,17 @@ import { IPC, type StreamVisibility, type StreamWindowBounds } from '../shared/t
 import { AUDIO_IPC } from './services/audio-capture';
 import * as chatHistory from './services/chat-history-store';
 
+// Swallow EPIPE on stdout/stderr — happens when the parent shell that
+// launched `npm start` is closed; subsequent console.log() calls would
+// otherwise crash the whole app with "A JavaScript error occurred in
+// the main process". The logs are still useful when the parent is
+// alive; we just stop the app from dying when it isn't.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code !== 'EPIPE') throw err;
+  });
+}
+
 // Prevent multiple instances
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
