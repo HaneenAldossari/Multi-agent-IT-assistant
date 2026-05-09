@@ -170,18 +170,44 @@ export async function runNcaAuditAndFix(onStep?: StepCallback): Promise<AuditAnd
     let outcome: FixOutcome;
 
     // Narrate what's about to happen so the user isn't surprised by
-    // password dialogs / window pop-ups.
+    // password dialogs / window pop-ups. Some actions (firewall) trigger
+    // a blocking system dialog the moment we call them, so we use longer
+    // pauses on those to give the user time to read.
     if (onStep) {
-      const beforeMsg: Record<string, string> = {
-        screen_lock: '🔧 يفعّل قفل الشاشة الفوري...',
-        firewall: '🔧 سيظهر طلب كلمة سر المسؤول لتفعيل جدار الحماية...',
-        os_updates: '🔧 يفتح Software Update لمراجعة التحديثات المتوفرة...',
-        filevault: '⚠️ سيفتح إعدادات FileVault — لن يُفعَّل تلقائياً (خطر فقد البيانات)...',
+      const beforeMsg: Record<string, { lines: string[]; pause: number }> = {
+        screen_lock: {
+          lines: ['🔧 الخطوة التالية: تفعيل قفل الشاشة الفوري'],
+          pause: STEP_PAUSE_MS,
+        },
+        firewall: {
+          lines: [
+            '🔧 الخطوة التالية: تفعيل جدار الحماية (NCA-ECC-2-T5-1)',
+            '⚠️ سيظهر طلب كلمة سر المسؤول — اكتبي كلمة السر واضغطي OK لتفعيله',
+          ],
+          pause: 2500, // give user time to read before macOS dialog steals focus
+        },
+        os_updates: {
+          lines: [
+            '🔧 الخطوة التالية: فتح Software Update',
+            'سأفتح لكِ النافذة لتراجعي التحديثات المتوفرة وتثبّتيها',
+          ],
+          pause: 1500,
+        },
+        filevault: {
+          lines: [
+            '⚠️ الخطوة التالية: مراجعة FileVault',
+            'لن يُفعَّل تلقائياً (خطر فقد البيانات إن لم تُحفظ مفاتيح الاسترجاع)',
+          ],
+          pause: 1500,
+        },
       };
       const msg = beforeMsg[check.id];
       if (msg) {
-        await onStep(msg);
-        await pause(STEP_PAUSE_MS);
+        for (const line of msg.lines) {
+          await onStep(line);
+          await pause(STEP_PAUSE_MS);
+        }
+        await pause(msg.pause);
       }
     }
 
