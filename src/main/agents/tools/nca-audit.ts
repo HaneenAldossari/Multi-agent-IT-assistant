@@ -33,7 +33,7 @@ export interface AuditReport {
 
 // ── Individual checks ──────────────────────────────────────────────────
 
-async function checkFileVault(): Promise<AuditCheck> {
+export async function checkFileVault(): Promise<AuditCheck> {
   try {
     const { stdout } = await execAsync('fdesetup status');
     const isOn = /FileVault is On/i.test(stdout);
@@ -52,7 +52,7 @@ async function checkFileVault(): Promise<AuditCheck> {
   }
 }
 
-async function checkScreenLock(): Promise<AuditCheck> {
+export async function checkScreenLock(): Promise<AuditCheck> {
   try {
     const { stdout: askForPwd } = await execAsync(
       'defaults read com.apple.screensaver askForPassword 2>/dev/null || echo 0',
@@ -75,7 +75,7 @@ async function checkScreenLock(): Promise<AuditCheck> {
   }
 }
 
-async function checkFirewall(): Promise<AuditCheck> {
+export async function checkFirewall(): Promise<AuditCheck> {
   try {
     const { stdout } = await execAsync(
       'defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo 0',
@@ -98,7 +98,7 @@ async function checkFirewall(): Promise<AuditCheck> {
   }
 }
 
-async function checkUpdates(): Promise<AuditCheck> {
+export async function checkUpdates(): Promise<AuditCheck> {
   // Use last-successful-update date instead of `softwareupdate --list`.
   // The latter contacts Apple's servers (~30s); the former is a local
   // plist read (~50ms). For NCA compliance we only need to know that
@@ -137,7 +137,7 @@ async function checkUpdates(): Promise<AuditCheck> {
   }
 }
 
-async function checkPasswordPolicy(): Promise<AuditCheck> {
+export async function checkPasswordPolicy(): Promise<AuditCheck> {
   // Check if a login password is required at all (most basic policy check)
   // Full pwpolicy requires admin and varies — we keep this simple and reliable.
   try {
@@ -174,17 +174,11 @@ function unknownCheck(id: string, ref: string, title: string): AuditCheck {
 
 // ── Public entry point ────────────────────────────────────────────────
 
-export async function runNcaAudit(): Promise<AuditReport> {
-  // Run all checks in parallel for speed
-  const [fv, sl, fw, up, pw] = await Promise.all([
-    checkFileVault(),
-    checkScreenLock(),
-    checkFirewall(),
-    checkUpdates(),
-    checkPasswordPolicy(),
-  ]);
-
-  const checks = [fv, sl, fw, up, pw];
+/** Build a full AuditReport from a list of pre-run checks. Exposed so
+ * callers (like the verbose narrated audit in nca-fix.ts) can run the
+ * checks sequentially with their own pacing and still produce the same
+ * report shape. */
+export function buildAuditReport(checks: AuditCheck[]): AuditReport {
   const passCount = checks.filter((c) => c.status === 'pass').length;
   const failCount = checks.filter((c) => c.status === 'fail').length;
   const warnCount = checks.filter((c) => c.status === 'warn' || c.status === 'unknown').length;
@@ -220,4 +214,17 @@ export async function runNcaAudit(): Promise<AuditReport> {
     .join('\n');
 
   return { passCount, failCount, warnCount, totalChecks: checks.length, checks, summaryArabic, summaryEnglish, overallStatus };
+}
+
+/** Fast parallel audit (all 5 checks at once). Used for re-audit after
+ * fixes. The verbose, narrated, sequential version lives in nca-fix.ts. */
+export async function runNcaAudit(): Promise<AuditReport> {
+  const [fv, sl, fw, up, pw] = await Promise.all([
+    checkFileVault(),
+    checkScreenLock(),
+    checkFirewall(),
+    checkUpdates(),
+    checkPasswordPolicy(),
+  ]);
+  return buildAuditReport([fv, sl, fw, up, pw]);
 }

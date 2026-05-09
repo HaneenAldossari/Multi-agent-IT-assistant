@@ -13,7 +13,17 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { runNcaAudit, type AuditReport } from './nca-audit';
+import {
+  runNcaAudit,
+  buildAuditReport,
+  checkFileVault,
+  checkScreenLock,
+  checkFirewall,
+  checkUpdates,
+  checkPasswordPolicy,
+  type AuditReport,
+  type AuditCheck,
+} from './nca-audit';
 const execAsync = promisify(exec);
 
 // Lazy-load Electron's `dialog` so unit tests / standalone scripts can
@@ -205,6 +215,37 @@ async function openSoftwareUpdate(): Promise<FixOutcome> {
   }
 }
 
+async function openPasswordSettings(): Promise<FixOutcome> {
+  // Modern macOS: Touch ID & Password is the canonical pane for managing
+  // the login password. Older versions used Users & Groups. Try the new
+  // URL first, fall back to the older one.
+  const urls = [
+    'open "x-apple.systempreferences:com.apple.Touch-ID-Password-Settings.extension"',
+    'open "x-apple.systempreferences:com.apple.preferences.password"',
+    'open "x-apple.systempreferences:com.apple.preferences.users"',
+  ];
+  for (const url of urls) {
+    try {
+      await execAsync(url);
+      return {
+        id: 'password_policy',
+        titleArabic: 'سياسة كلمة المرور',
+        result: 'opened_settings',
+        detailsArabic:
+          '👉 اتبعي الخطوات:\n   1) اضغطي "Change Password..."\n   2) أدخلي كلمة سر قوية: 8+ أحرف، تتضمن أرقاماً ورموزاً\n   3) لا تستخدمي كلمة سر سابقة',
+      };
+    } catch {
+      continue;
+    }
+  }
+  return {
+    id: 'password_policy',
+    titleArabic: 'سياسة كلمة المرور',
+    result: 'skipped',
+    detailsArabic: 'تعذّر فتح إعدادات كلمة المرور',
+  };
+}
+
 async function openFileVaultSettings(): Promise<FixOutcome> {
   try {
     await execAsync(
@@ -254,20 +295,88 @@ export async function runNcaAuditAndFix(
   onStep?: StepCallback,
   onSay?: SayCallback,
 ): Promise<AuditAndFixReport> {
-  // Phase 1: audit (announce each check as it runs)
+  // Phase 1: SEQUENTIAL audit with verbose narration. Each check is run
+  // one at a time so the user can see the agent working through each
+  // requirement individually — not a black-box "5/5" summary. The
+  // commands and ncaRefs are spoken aloud so it's clear the system is
+  // really inspecting macOS state, not playing back a memorized result.
+  const stages: Array<{
+    label: string;
+    ref: string;
+    cmd: string;
+    fn: () => Promise<AuditCheck>;
+  }> = [
+    {
+      label: 'تشفير القرص (FileVault)',
+      ref: 'NCA-ECC-2-T4-1',
+      cmd: 'fdesetup status',
+      fn: checkFileVault,
+    },
+    {
+      label: 'قفل الشاشة التلقائي',
+      ref: 'NCA-ECC-2-T2-3',
+      cmd: 'defaults read com.apple.screensaver askForPassword',
+      fn: checkScreenLock,
+    },
+    {
+      label: 'جدار الحماية (Firewall)',
+      ref: 'NCA-ECC-2-T5-1',
+      cmd: 'defaults read /Library/Preferences/com.apple.alf globalstate',
+      fn: checkFirewall,
+    },
+    {
+      label: 'تحديثات نظام التشغيل',
+      ref: 'NCA-ECC-2-T6-2',
+      cmd: 'defaults read /Library/Preferences/com.apple.SoftwareUpdate LastSuccessfulDate',
+      fn: checkUpdates,
+    },
+    {
+      label: 'سياسة كلمة المرور',
+      ref: 'NCA-ECC-2-T2-1',
+      cmd: 'dscl . -read /Users/$(whoami) Password',
+      fn: checkPasswordPolicy,
+    },
+  ];
+
   if (onStep) {
-    await onStep('🔍 المرحلة 1: فحص الأمان (5 ضوابط NCA-ECC)');
-    await pause(STEP_PAUSE_MS);
+    await onStep('🔍 المرحلة 1: فحص الأمان — 5 ضوابط NCA-ECC');
+    await pause(900);
   }
-  const beforeReport = await runNcaAudit();
-  if (onStep) {
-    for (const c of beforeReport.checks) {
-      const icon = c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : '⚠️';
-      await onStep(`${icon} ${c.titleArabic} (${c.ncaRef})`);
-      await pause(STEP_PAUSE_MS);
+  if (onSay) {
+    onSay('بدأتُ الفحص — أتحقّق من خمسة ضوابط NCA-ECC أساسية، واحداً تلو الآخر:\n\n');
+  }
+
+  const checkResults: AuditCheck[] = [];
+  for (let i = 0; i < stages.length; i++) {
+    const stage = stages[i];
+    const stepHeader = `الفحص ${i + 1}/5`;
+    if (onStep) {
+      await onStep(`🔎 ${stepHeader}: ${stage.label}`);
+      await pause(700);
+      await onStep(`   $ ${stage.cmd}`);
+      await pause(900);
     }
-    await onStep(`📊 النتيجة الأولية: ${beforeReport.passCount}/${beforeReport.totalChecks}`);
-    await pause(STEP_PAUSE_MS);
+    // Actually run the underlying check
+    const result = await stage.fn();
+    const icon = result.status === 'pass' ? '✅'
+      : result.status === 'fail' ? '❌' : '⚠️';
+    if (onStep) {
+      await onStep(`   ${icon} ${result.detailsArabic} (${stage.ref})`);
+      await pause(800);
+    }
+    if (onSay) {
+      onSay(`  ${icon} **${stage.label}** — ${result.detailsArabic}\n`);
+    }
+    checkResults.push(result);
+  }
+
+  const beforeReport = buildAuditReport(checkResults);
+  if (onStep) {
+    await pause(500);
+    await onStep(
+      `📊 النتيجة الأولية: ${beforeReport.passCount}/${beforeReport.totalChecks} مطابق`,
+    );
+    await pause(700);
   }
 
   // Phase 2: apply remediations
@@ -334,6 +443,14 @@ export async function runNcaAuditAndFix(
           ],
           finalPause: 1200,
         },
+        password_policy: {
+          lines: [
+            `🔧 ${stepHeader}: سياسة كلمة المرور`,
+            'سأفتح Touch ID & Password لتحديث كلمة سر قويّة',
+            'كلمة السر الجديدة: 8+ أحرف، أرقام، رموز',
+          ],
+          finalPause: 1200,
+        },
       };
       const msg = beforeMsg[check.id];
       if (msg) {
@@ -358,6 +475,8 @@ export async function runNcaAuditAndFix(
           `🔧 **تحديثات النظام** — سأفتح Software Update.\n  ▸ خطوة 1: اضغطي "Update Now" إذا ظهر\n  ▸ خطوة 2: أو "More info..." → اختاري التحديثات → "Install Now"\n`,
         filevault:
           `🔧 **تشفير القرص (FileVault)** — سأفتح Privacy & Security.\n  ⚠️ احفظي مفتاح الاسترجاع قبل التفعيل (خطر فقد البيانات).\n  ▸ خطوة 1: انزلي إلى قسم Security\n  ▸ خطوة 2: اضغطي FileVault → Turn On\n`,
+        password_policy:
+          `🔧 **سياسة كلمة المرور (NCA-ECC-2-T2-1)** — سأفتح Touch ID & Password.\n  ▸ خطوة 1: اضغطي "Change Password..."\n  ▸ خطوة 2: كلمة سر قوية: 8+ أحرف، أرقام، رموز\n`,
       };
       const text = sayBefore[check.id];
       if (text) onSay(text);
@@ -375,6 +494,9 @@ export async function runNcaAuditAndFix(
         break;
       case 'filevault':
         outcome = await openFileVaultSettings();
+        break;
+      case 'password_policy':
+        outcome = await openPasswordSettings();
         break;
       default:
         continue;
@@ -421,6 +543,12 @@ export async function runNcaAuditAndFix(
             '⚠️ FileVault خطير — لا تفعّليه قبل حفظ مفتاح الاسترجاع',
             '👉 راجعي الإعدادات فقط لهذه الخطوة',
             'هذه خطوة اختيارية تتطلب قرارك',
+          ],
+          password_policy: [
+            `${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`,
+            '👉 اضغطي "Change Password..." لتحديث كلمة السر',
+            '⏳ بانتظارك... كلمة سر قوية: 8+ أحرف + أرقام + رموز',
+            'لا تستخدمي كلمة سر سبق استخدامها',
           ],
         };
         const seq = nudges[check.id] ?? [`${icon} ${outcome.titleArabic}: ${outcome.detailsArabic}`];
