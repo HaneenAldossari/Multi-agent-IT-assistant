@@ -230,13 +230,16 @@ export async function runMemoryAgent(
 
   let finalText = '';
   try {
+    // Note: screen context intentionally NOT included here. The voice
+    // transcript is enough for the demo scenarios, and the screen context
+    // string ("Foreground app: Terminal — claude --resume") was confusing
+    // the model into thinking the user was debugging instead of acting.
+    void screenContext;
     for await (const message of sdk.query({
-      prompt: screenContext
-        ? `[Voice transcript from employee]: ${transcript}\n[Screen context]: ${screenContext}\n\nUse the screen context to disambiguate the user's intent if the voice is vague. Respond with JSON only.`
-        : `[Voice transcript from employee — analyze and respond with JSON only]: ${transcript}`,
+      prompt: `[Voice transcript from employee]: ${transcript}\n\nClassify this request and respond with a single JSON object. Use searchPastTickets first.`,
       options: {
         model: 'claude-sonnet-4-5',
-        maxTurns: 2,
+        maxTurns: 4,
         systemPrompt: SYSTEM_PROMPT,
         mcpServers: { memory: memoryServer as never },
         allowedTools: ['mcp__memory__searchPastTickets'],
