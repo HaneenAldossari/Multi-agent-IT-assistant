@@ -162,6 +162,21 @@ export async function handleUserRequest(
     emit(onAgentMessage, 'reporter', 'done', 'تم تسليم الرد مع البديل');
     emit(onAgentMessage, 'memory', 'done', memory.summaryArabic);
 
+    // ── Active demonstration: open Google search for the alternative ─────
+    // Goes from "agent told you" to "agent showed you" — opens a real
+    // browser tab with the search results so the user can act immediately.
+    if (guardianPre.suggestedSearchQuery) {
+      const q = encodeURIComponent(guardianPre.suggestedSearchQuery);
+      const url = `https://www.google.com/search?q=${q}`;
+      console.log(`[orchestrator] Opening alternative search: ${url}`);
+      try {
+        const { exec } = await import('child_process');
+        exec(`open "${url}"`);
+      } catch (err) {
+        console.error('[orchestrator] failed to open search URL:', err);
+      }
+    }
+
     return { finalUserMessage, cursorTarget: null };
   }
 

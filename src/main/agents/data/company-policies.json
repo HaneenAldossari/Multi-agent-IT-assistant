@@ -22,7 +22,8 @@
     "applies_to_actions": ["install_software", "install_app", "download_executable", "install_from_url"],
     "verdict_default": "block",
     "blocks_action": true,
-    "suggested_alternative_arabic": "استخدمي بوابة البرامج المعتمدة في الشركة — فيها بدائل مرخّصة وآمنة لكل البرامج الشائعة (مثلاً: 7-Zip بدل WinRAR، VS Code بدل المحررات غير المعتمدة)."
+    "suggested_alternative_arabic": "استخدمي بوابة البرامج المعتمدة في الشركة — فيها بدائل مرخّصة وآمنة لكل البرامج الشائعة (مثلاً: 7-Zip بدل WinRAR، VS Code بدل المحررات غير المعتمدة).",
+    "suggested_search_query": "7-Zip Mac download official"
   },
   {
     "id": "NCA-NSEC-4-T2-1",
